@@ -1,0 +1,51 @@
+Source: python-imageio
+Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
+Uploaders: Ghislain Antony Vaillant <ghisvail@gmail.com>
+Section: python
+Priority: optional
+Build-Depends: debhelper-compat (= 12),
+               dh-python,
+               dpkg-dev (>= 1.17.14),
+               python3-all,
+               python3-numpy <!nocheck> <!nodoc>,
+               python3-numpydoc <!nodoc>,
+               python3-pil <!nocheck>,
+               python3-psutil <!nocheck>,
+               python3-pytest <!nocheck>,
+               python3-setuptools,
+               python3-sphinx <!nodoc>,
+               sphinx-common
+Standards-Version: 4.4.0
+Rules-Requires-Root: no
+Vcs-Browser: https://salsa.debian.org/science-team/python-imageio
+Vcs-Git: https://salsa.debian.org/science-team/python-imageio.git
+Homepage: http://imageio.github.io/
+
+Package: python3-imageio
+Architecture: all
+Depends: ${misc:Depends},
+         ${python3:Depends}
+Suggests: python-imageio-doc <!nodoc>,
+          python3-astropy,
+          python3-gdal,
+          ffmpeg
+Description: library for reading and writing image data (Python 3)
+ Imageio is a Python library that provides an easy interface to read and write
+ a wide range of image data, including animated images, video, volumetric data,
+ and scientific formats.
+ .
+ This package provides the library for Python 3.
+
+Package: python-imageio-doc
+Architecture: all
+Section: doc
+Depends: ${misc:Depends},
+         ${sphinxdoc:Depends}
+Built-Using: ${sphinxdoc:Built-Using}
+Description: documentation for imageio
+ Imageio is a Python library that provides an easy interface to read and write
+ a wide range of image data, including animated images, video, volumetric data,
+ and scientific formats.
+ .
+ This package provides the documentation.
+Build-Profiles: <!nodoc>

@@ -1,0 +1,21 @@
+From: Ghislain Antony Vaillant <ghisvail@gmail.com>
+Date: Wed, 28 Dec 2016 14:45:12 +0000
+Subject: Use the system libraries
+
+---
+ imageio/core/findlib.py | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/imageio/core/findlib.py b/imageio/core/findlib.py
+index f039445..e3aada8 100644
+--- a/imageio/core/findlib.py
++++ b/imageio/core/findlib.py
+@@ -15,7 +15,7 @@ import ctypes
+ LOCALDIR = os.path.abspath(os.path.dirname(__file__))
+ 
+ # Flag that can be patched / set to True to disable loading non-system libs
+-SYSTEM_LIBS_ONLY = False
++SYSTEM_LIBS_ONLY = True
+ 
+ 
+ def looks_lib(fname):

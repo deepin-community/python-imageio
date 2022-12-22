@@ -1,0 +1,9 @@
+Document: python-imageio-doc
+Title: imageio Documentation
+Author: Almar Klein
+Abstract: This is the reference documentation for imageio.
+Section: Programming/Python
+
+Format: HTML
+Index: /usr/share/doc/python-imageio-doc/html/index.html
+Files: /usr/share/doc/python-imageio-doc/html/*.html

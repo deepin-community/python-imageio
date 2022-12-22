@@ -1,0 +1,11 @@
+Test-Command: set -e
+ ; cp -a tests/* "$AUTOPKGTEST_TMP"
+ ; for py in $(py3versions -r 2>/dev/null)
+ ; do cd "$AUTOPKGTEST_TMP"
+ ; echo "Testing with $py:"
+ ; IMAGEIO_NO_INTERNET=1 $py -m pytest -v .
+ ; done
+Depends: python3-all,
+         python3-imageio,
+         python3-psutil,
+         python3-pytest

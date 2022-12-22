@@ -1,0 +1,78 @@
+Description: Skip tests trying to access remote URLs
+Author: Andreas Tille <tille@debian.org>
+Last-Update: Sat, 08 Sep 2018 11:02:04 +0200
+
+--- a/tests/test_core.py
++++ b/tests/test_core.py
+@@ -135,71 +135,6 @@ def test_findlib2():
+     raises(OSError, core.load_lib, ["thislibdoesnotexist_foobar"], [])
+     raises(OSError, core.load_lib, [], ["notalib"], [fi_dir])
+ 
+-
+-def test_request():
+-    """ Test request object """
+-
+-    # Check uri-type, this is not a public property, so we test the private
+-    R = Request("http://example.com", "ri")
+-    assert R._uri_type == core.request.URI_HTTP
+-    R = Request("ftp://example.com", "ri")
+-    assert R._uri_type == core.request.URI_FTP
+-    R = Request("file://~/foo.png", "wi")
+-    assert R._uri_type == core.request.URI_FILENAME
+-    R = Request("<video0>", "rI")
+-    assert R._uri_type == core.request.URI_BYTES
+-    R = Request(imageio.RETURN_BYTES, "wi")
+-    assert R._uri_type == core.request.URI_BYTES
+-    #
+-    fname = get_remote_file("images/chelsea.png", test_dir)
+-    R = Request(fname, "ri")
+-    assert R._uri_type == core.request.URI_FILENAME
+-    R = Request("~/filethatdoesnotexist", "wi")
+-    assert R._uri_type == core.request.URI_FILENAME  # Too short to be bytes
+-    R = Request(b"x" * 600, "ri")
+-    assert R._uri_type == core.request.URI_BYTES
+-    R = Request(sys.stdin, "ri")
+-    assert R._uri_type == core.request.URI_FILE
+-    R = Request(sys.stdout, "wi")
+-    assert R._uri_type == core.request.URI_FILE
+-    # exapand user dir
+-    R = Request("~/foo", "wi")
+-    assert R.filename == os.path.expanduser("~/foo").replace("/", os.path.sep)
+-    # zip file
+-    R = Request("~/bar.zip/spam.png", "wi")
+-    assert R._uri_type == core.request.URI_ZIPPED
+-
+-    # Test failing inits
+-    raises(ValueError, Request, "/some/file", None)  # mode must be str
+-    raises(ValueError, Request, "/some/file", 3)  # mode must be str
+-    raises(ValueError, Request, "/some/file", "")  # mode must be len 2
+-    raises(ValueError, Request, "/some/file", "r")  # mode must be len 2
+-    raises(ValueError, Request, "/some/file", "rii")  # mode must be len 2
+-    raises(ValueError, Request, "/some/file", "xi")  # mode[0] must be in rw
+-    raises(ValueError, Request, "/some/file", "rx")  # mode[1] must be in iIvV?
+-    #
+-    raises(IOError, Request, ["invalid", "uri"] * 10, "ri")  # invalid uri
+-    raises(IOError, Request, 4, "ri")  # invalid uri
+-    # nonexistent reads
+-    raises(FileNotFoundError, Request, "/does/not/exist", "ri")
+-    raises(FileNotFoundError, Request, "/does/not/exist.zip/spam.png", "ri")
+-    if Path is not None:
+-        raises(FileNotFoundError, Request, Path("/does/not/exist"), "ri")
+-    raises(IOError, Request, "http://example.com", "wi")  # no writing here
+-    # write dir nonexist
+-    raises(FileNotFoundError, Request, "/does/not/exist.png", "wi")
+-    if Path is not None:
+-        raises(FileNotFoundError, Request, Path("/does/not/exist.png"), "wi")
+-
+-    # Test auto-download
+-    R = Request("imageio:chelsea.png", "ri")
+-    assert R.filename == get_remote_file("images/chelsea.png")
+-    #
+-    R = Request("imageio:chelsea.zip/chelsea.png", "ri")
+-    assert R._filename_zip[0] == get_remote_file("images/chelsea.zip")
+-    assert R.filename == get_remote_file("images/chelsea.zip") + "/chelsea.png"
+-
+-
+ def test_request_read_sources():
+ 
+     # Make an image available in many ways
