@@ -1,25 +1,27 @@
 Source: python-imageio
 Maintainer: Debian Science Maintainers <debian-science-maintainers@lists.alioth.debian.org>
-Uploaders: Ghislain Antony Vaillant <ghisvail@gmail.com>
+Uploaders: Ole Streicher <olebole@debian.org>,
+ Ghislain Antony Vaillant <ghisvail@gmail.com>
 Section: python
 Priority: optional
-Build-Depends: debhelper-compat (= 12),
+Build-Depends: debhelper-compat (= 13),
                dh-python,
-               dpkg-dev (>= 1.17.14),
                python3-all,
                python3-numpy <!nocheck> <!nodoc>,
                python3-numpydoc <!nodoc>,
+               python3-fsspec <!nocheck>,
                python3-pil <!nocheck>,
                python3-psutil <!nocheck>,
                python3-pytest <!nocheck>,
                python3-setuptools,
+               python3-pydata-sphinx-theme <!nodoc>,
                python3-sphinx <!nodoc>,
                sphinx-common
-Standards-Version: 4.4.0
-Rules-Requires-Root: no
+Standards-Version: 4.6.2
 Vcs-Browser: https://salsa.debian.org/science-team/python-imageio
 Vcs-Git: https://salsa.debian.org/science-team/python-imageio.git
-Homepage: http://imageio.github.io/
+Homepage: https://imageio.github.io/
+Rules-Requires-Root: no
 
 Package: python3-imageio
 Architecture: all
@@ -38,6 +40,7 @@ Description: library for reading and writing image data (Python 3)
 
 Package: python-imageio-doc
 Architecture: all
+Multi-Arch: foreign
 Section: doc
 Depends: ${misc:Depends},
          ${sphinxdoc:Depends}

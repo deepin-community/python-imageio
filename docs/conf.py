@@ -11,13 +11,33 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import sys
+import os
+import imageio
+import inspect
+import importlib
+from pathlib import Path
+
+
+# import/load the plugins so that they can be documented
+import imageio.plugins.bsdf
+import imageio.plugins.dicom
+import imageio.plugins.feisem
+import imageio.plugins.fits
+import imageio.plugins.freeimage
+import imageio.plugins.gdal
+import imageio.plugins.lytro
+import imageio.plugins.npz
+import imageio.plugins.pillow_legacy
+import imageio.plugins.simpleitk
+import imageio.plugins.spe
+import imageio.plugins.swf
+
 
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 sys.path.insert(0, os.path.abspath("."))
-
 
 # -- General configuration -----------------------------------------------------
 
@@ -28,19 +48,21 @@ sys.path.insert(0, os.path.abspath("."))
 # coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
     "sphinx.ext.autodoc",
-    # 'sphinx.ext.autosummary',
+    "sphinx.ext.autosummary",
     "numpydoc",
     "imageio_ext",
+    "sphinx.ext.linkcode",
 ]
 
 # Monkey-patch numpydoc to don't do the autosummary thing
-from numpydoc.docscrape_sphinx import SphinxDocString
+from numpydoc.docscrape_sphinx import SphinxDocString  # noqa:E402
 
 assert SphinxDocString._str_member_list
 SphinxDocString._str_member_list = lambda self, name: []
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ["_templates"]
+autodoc_mock_imports = ["av", "cv2", "imageio_ffmpeg", "tifffile"]
 
 # The suffix of source filenames.
 source_suffix = ".rst"
@@ -52,16 +74,13 @@ source_suffix = ".rst"
 master_doc = "index"
 
 # General information about the project.
-project = u"imageio"
-copyright = u"2014-2018, imageio contributors"
+project = "imageio"
+copyright = "2014-2021, imageio contributors"
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
-# The short X.Y version.
-import imageio
-
 # The short X.Y version.
 version = imageio.__version__[:3]
 # The full version, including alpha/beta/rc tags.
@@ -102,16 +121,86 @@ pygments_style = "sphinx"
 # modindex_common_prefix = []
 
 
+# Function to generate source links pointing to GitHub
+def linkcode_resolve(domain, info):
+    if domain != "py":
+        return None
+
+    obj = importlib.import_module(info["module"])
+    source_file = Path(inspect.getsourcefile(obj))
+    file_path = "/" + "/".join(info["module"].split("."))
+
+    # try to get a better file path
+    add_linenumbers = False
+    for part in info["fullname"].split("."):
+        try:
+            obj = getattr(obj, part)
+        except AttributeError:
+            break
+
+        try:
+            source_file = Path(inspect.getsourcefile(obj))
+        except TypeError:
+            break
+
+        path_elements = [source_file.name]
+        for parent in source_file.parents:
+            path_elements = [parent.name] + path_elements
+            if parent.name == "imageio":
+                break
+
+        file_path = "/".join(path_elements)
+    else:
+        add_linenumbers = True
+
+    source_url = (
+        f"https://github.com/imageio/imageio/blob/v{imageio.__version__}/{file_path}"
+    )
+
+    if add_linenumbers:
+        try:
+            source_lines, start = inspect.getsourcelines(obj)
+        except OSError:
+            pass
+        else:
+            end = start + len(source_lines) - 1
+            source_url += f"#L{start}-L{end}"
+
+    return source_url
+
+
 # -- Options for HTML output ---------------------------------------------------
 
 # The theme to use for HTML and HTML Help pages.  See the documentation for
 # a list of builtin themes.
-# html_theme = 'default'
-
-# Theme options are theme-specific and customize the look and feel of a theme
-# further.  For a list of options available for each theme, see the
-# documentation.
-# html_theme_options = {}
+html_theme = "pydata_sphinx_theme"
+html_logo = "_static/imageio_logo.png"
+html_theme_options = {
+    "external_links": [],
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/imageio/imageio",
+            "icon": "fab fa-github-square",
+        },
+        {
+            "name": "PyPI",
+            "url": "https://pypi.org/project/imageio/",
+            "icon": "fas fa-box",
+        },
+    ],
+    "use_edit_page_button": True,
+    "analytics": {
+        "google_analytics_id": "G-EFE74Z5D7E",
+    },
+}
+html_context = {
+    # "github_url": "https://github.com", # or your GitHub Enterprise interprise
+    "github_user": "imageio",
+    "github_repo": "imageio",
+    "github_version": "master",
+    "doc_path": "docs/",
+}
 
 # Add any paths that contain custom themes here, relative to this directory.
 # html_theme_path = []
@@ -135,7 +224,7 @@ pygments_style = "sphinx"
 # Add any paths that contain custom static files (such as style sheets) here,
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
-html_static_path = []  # ['_static']
+html_static_path = ["_static"]
 
 # If not '', a 'Last updated on:' timestamp is inserted at every page bottom,
 # using the given strftime format.
@@ -199,8 +288,8 @@ latex_documents = [
     (
         "index",
         "imageio.tex",
-        u"imageio Documentation",
-        u"imageio contributors",
+        "imageio Documentation",
+        "imageio contributors",
         "manual",
     )
 ]
@@ -230,9 +319,7 @@ latex_documents = [
 
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
-man_pages = [
-    ("index", "imageio", u"imageio Documentation", [u"imageio contributors"], 1)
-]
+man_pages = [("index", "imageio", "imageio Documentation", ["imageio contributors"], 1)]
 
 # If true, show URL addresses after external links.
 # man_show_urls = False
@@ -247,8 +334,8 @@ texinfo_documents = [
     (
         "index",
         "imageio",
-        u"imageio Documentation",
-        u"imageio contributors",
+        "imageio Documentation",
+        "imageio contributors",
         "imageio",
         "One line description of project.",
         "Miscellaneous",

@@ -2,11 +2,14 @@
 PIL formats for multiple images.
 """
 
-import sys
+import logging
+
 import numpy as np
 
-from .pillow import PillowFormat, ndarray_to_pil, image_as_uint
+from .pillow_legacy import PillowFormat, ndarray_to_pil, image_as_uint
 
+
+logger = logging.getLogger(__name__)
 
 NeuQuant = None  # we can implement this when we need it
 
@@ -17,44 +20,12 @@ class TIFFFormat(PillowFormat):
 
 
 class GIFFormat(PillowFormat):
-    """ A format for reading and writing static and animated GIF, based
-    on Pillow.
-    
-    Images read with this format are always RGBA. Currently,
-    the alpha channel is ignored when saving RGB images with this
-    format.
-    
-    Parameters for reading
-    ----------------------
-    None
-    
-    Parameters for saving
-    ---------------------
-    loop : int
-        The number of iterations. Default 0 (meaning loop indefinitely).
-    duration : {float, list}
-        The duration (in seconds) of each frame. Either specify one value
-        that is used for all frames, or one value for each frame.
-        Note that in the GIF format the duration/delay is expressed in
-        hundredths of a second, which limits the precision of the duration.
-    fps : float
-        The number of frames per second. If duration is not given, the
-        duration for each frame is set to 1/fps. Default 10.
-    palettesize : int
-        The number of colors to quantize the image to. Is rounded to
-        the nearest power of two. Default 256.
-    subrectangles : bool
-        If True, will try and optimize the GIF by storing only the
-        rectangular parts of each frame that change with respect to the
-        previous. Default False.
-    """
+    """See :mod:`imageio.plugins.pillow_legacy`"""
 
     _modes = "iI"
     _description = "Static and animated gif (Pillow)"
 
-    class Reader(PillowFormat.Reader):
-        def _open(self, playback=None):  # compat with FI format
-            return PillowFormat.Reader._open(self)
+    # GIF reader needs no modifications compared to base pillow reader
 
     class Writer(PillowFormat.Writer):
         def _open(
@@ -66,14 +37,13 @@ class GIFFormat(PillowFormat):
             quantizer=0,
             subrectangles=False,
         ):
-
             # Check palettesize
             palettesize = int(palettesize)
             if palettesize < 2 or palettesize > 256:
                 raise ValueError("GIF quantize param must be 2..256")
             if palettesize not in [2, 4, 8, 16, 32, 64, 128, 256]:
                 palettesize = 2 ** int(np.log2(128) + 0.999)
-                print(
+                logger.warning(
                     "Warning: palettesize (%r) modified to a factor of "
                     "two between 2-256." % palettesize
                 )
@@ -115,20 +85,12 @@ class GIFFormat(PillowFormat):
             return
 
 
-if sys.version_info >= (3,):
-    intToBin = lambda i: i.to_bytes(2, byteorder="little")
-else:
-
-    def intToBin(i):
-        """Integer to two bytes"""
-        # No int.to_bytes() in Legacy Python
-        i1 = i % 256
-        i2 = int(i / 256)
-        return chr(i1) + chr(i2)  # little endian
+def intToBin(i):
+    return i.to_bytes(2, byteorder="little")
 
 
 class GifWriter:
-    """ Class that for helping write the animated GIF file. This is based on
+    """Class that for helping write the animated GIF file. This is based on
     code from images2gif.py (part of visvis). The version here is modified
     to allow streamed writing.
     """
@@ -157,7 +119,6 @@ class GifWriter:
         self.getdata = getdata
 
     def add_image(self, im, duration, dispose):
-
         # Prepare image
         im_rect, rect = im, (0, 0)
         if self.opt_subrectangle:
@@ -195,7 +156,6 @@ class GifWriter:
         self.fp.write(";".encode("utf-8"))  # end gif
 
     def write_image(self, im, palette, rect, duration, dispose):
-
         fp = self.fp
 
         # Gather local image header and data, using PIL's getdata. That
@@ -229,8 +189,7 @@ class GifWriter:
             fp.write(d)
 
     def getheaderAnim(self, im):
-        """ Get animation header. To replace PILs getheader()[0]
-        """
+        """Get animation header. To replace PILs getheader()[0]"""
         bb = b"GIF89a"
         bb += intToBin(im.size[0])
         bb += intToBin(im.size[1])
@@ -238,7 +197,7 @@ class GifWriter:
         return bb
 
     def getImageDescriptor(self, im, xy=None):
-        """ Used for the local color table properties per image.
+        """Used for the local color table properties per image.
         Otherwise global color table applies to all frames irrespective of
         whether additional colors comes in play that require a redefined
         palette. Still a maximum of 256 color per frame, obviously.
@@ -268,13 +227,13 @@ class GifWriter:
         return bb
 
     def getAppExt(self, loop):
-        """ Application extension. This part specifies the amount of loops.
+        """Application extension. This part specifies the amount of loops.
         If loop is 0 or inf, it goes on infinitely.
         """
         if loop == 1:
             return b""
         if loop == 0:
-            loop = 2 ** 16 - 1
+            loop = 2**16 - 1
         bb = b""
         if loop != 0:  # omit the extension if we would like a nonlooping gif
             bb = b"\x21\xFF\x0B"  # application extension
@@ -285,16 +244,16 @@ class GifWriter:
         return bb
 
     def getGraphicsControlExt(self, duration=0.1, dispose=2):
-        """ Graphics Control Extension. A sort of header at the start of
+        """Graphics Control Extension. A sort of header at the start of
         each image. Specifies duration and transparancy.
 
         Dispose
         -------
           * 0 - No disposal specified.
           * 1 - Do not dispose. The graphic is to be left in place.
-          * 2 -	Restore to background color. The area used by the graphic
+          * 2 - Restore to background color. The area used by the graphic
             must be restored to the background color.
-          * 3 -	Restore to previous. The decoder is required to restore the
+          * 3 - Restore to previous. The decoder is required to restore the
             area overwritten by the graphic with what was there prior to
             rendering the graphic.
           * 4-7 -To be defined.
@@ -311,7 +270,7 @@ class GifWriter:
         return bb
 
     def getSubRectangle(self, im):
-        """ Calculate the minimal rectangle that need updating. Returns
+        """Calculate the minimal rectangle that need updating. Returns
         a two-element tuple containing the cropped image and an x-y tuple.
 
         Calculating the subrectangles takes extra time, obviously. However,
@@ -344,7 +303,7 @@ class GifWriter:
 
     def converToPIL(self, im, quantizer, palette_size=256):
         """Convert image to Paletted PIL image.
-        
+
         PIL used to not do a very good job at quantization, but I guess
         this has improved a lot (at least in Pillow). I don't think we need
         neuqant (and we can add it later if we really want).

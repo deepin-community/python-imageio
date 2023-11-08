@@ -1,22 +1,21 @@
 # -*- coding: utf-8 -*-
 # imageio is distributed under the terms of the (new) BSD License.
 
-""" Plugin for multi-image freeimafe formats, like animated GIF and ico.
+"""Plugin for multi-image freeimafe formats, like animated GIF and ico.
 """
 
-from __future__ import absolute_import, print_function, division
-
+import logging
 import numpy as np
 
-from .. import formats
 from ..core import Format, image_as_uint
 from ._freeimage import fi, IO_FLAGS
 from .freeimage import FreeimageFormat
 
+logger = logging.getLogger(__name__)
+
 
 class FreeimageMulti(FreeimageFormat):
-    """ Base class for freeimage formats that support multiple images.
-    """
+    """Base class for freeimage formats that support multiple images."""
 
     _modes = "iI"
     _fif = -1
@@ -97,8 +96,8 @@ class FreeimageMulti(FreeimageFormat):
 
 
 class MngFormat(FreeimageMulti):
-    """ An Mng format based on the Freeimage library.
-    
+    """An Mng format based on the Freeimage library.
+
     Read only. Seems broken.
     """
 
@@ -109,13 +108,13 @@ class MngFormat(FreeimageMulti):
 
 
 class IcoFormat(FreeimageMulti):
-    """ An ICO format based on the Freeimage library.
-    
+    """An ICO format based on the Freeimage library.
+
     This format supports grayscale, RGB and RGBA images.
 
     The freeimage plugin requires a `freeimage` binary. If this binary
     is not available on the system, it can be downloaded by either
-    
+
     - the command line script ``imageio_download_bin freeimage``
     - the Python method ``imageio.plugins.freeimage.download()``
 
@@ -125,7 +124,7 @@ class IcoFormat(FreeimageMulti):
         Convert to 32-bit and create an alpha channel from the AND-
         mask when loading. Default False. Note that this returns wrong
         results if the image was already RGBA.
-    
+
     """
 
     _fif = 1
@@ -140,16 +139,16 @@ class IcoFormat(FreeimageMulti):
 
 
 class GifFormat(FreeimageMulti):
-    """ A format for reading and writing static and animated GIF, based
+    """A format for reading and writing static and animated GIF, based
     on the Freeimage library.
-    
+
     Images read with this format are always RGBA. Currently,
     the alpha channel is ignored when saving RGB images with this
     format.
 
     The freeimage plugin requires a `freeimage` binary. If this binary
     is not available on the system, it can be downloaded by either
-    
+
     - the command line script ``imageio_download_bin freeimage``
     - the Python method ``imageio.plugins.freeimage.download()``
 
@@ -158,7 +157,7 @@ class GifFormat(FreeimageMulti):
     playback : bool
         'Play' the GIF to generate each frame (as 32bpp) instead of
         returning raw frame data when loading. Default True.
-    
+
     Parameters for saving
     ---------------------
     loop : int
@@ -206,7 +205,6 @@ class GifFormat(FreeimageMulti):
     # -- writer
 
     class Writer(FreeimageMulti.Writer):
-
         # todo: subrectangles
         # todo: global palette
 
@@ -225,7 +223,7 @@ class GifFormat(FreeimageMulti):
                 raise ValueError("GIF quantize param must be 2..256")
             if palettesize not in [2, 4, 8, 16, 32, 64, 128, 256]:
                 palettesize = 2 ** int(np.log2(128) + 0.999)
-                print(
+                logger.warning(
                     "Warning: palettesize (%r) modified to a factor of "
                     "two between 2-256." % palettesize
                 )
@@ -290,9 +288,6 @@ class GifFormat(FreeimageMulti):
             # Quantize it if its RGB
             if im.ndim == 3 and im.shape[-1] == 3:
                 sub2 = sub1.quantize(self._quantizer, self._palettesize)
-            # If single image, omit animation data
-            if self.request.mode[1] == "i":
-                del meta["ANIMATION"]
             # Set meta data and return
             sub2.set_meta_data(meta)
             return sub2
@@ -319,11 +314,3 @@ class GifFormat(FreeimageMulti):
                 y0, y1 = 0, 2
             # Cut out and return
             return im[y0:y1, x0:x1], (x0, y0)
-
-
-# formats.add_format(MngFormat('MNG', 'Multiple network graphics',
-#                                    '.mng', 'iI'))
-formats.add_format(IcoFormat("ICO-FI", "Windows icon", ".ico", "iI"))
-formats.add_format(
-    GifFormat("GIF-FI", "Static and animated gif (FreeImage)", ".gif", "iI")
-)

@@ -3,9 +3,22 @@
 # imageio is distributed under the terms of the (new) BSD License.
 #
 
-""" Lytro Illum Plugin.
-    Plugin to read Lytro Illum .lfr and .raw files as produced
-    by the Lytro Illum light field camera.
+""" Read LFR files (Lytro Illum).
+
+Backend: internal
+
+Plugin to read Lytro Illum .lfr and .raw files as produced
+by the Lytro Illum light field camera. It is actually a collection
+of plugins, each supporting slightly different keyword arguments
+
+Parameters
+----------
+meta_only : bool
+    Whether to only read the metadata.
+include_thumbnail : bool
+    (only for lytro-lfr and lytro-lfp)
+    Whether to include an image thumbnail in the metadata.
+
 """
 #
 #
@@ -18,17 +31,19 @@
 #   (https://github.com/behnam/python-lfp-reader/)
 
 
-from __future__ import absolute_import, print_function, division
 import os
 import json
 import struct
+import logging
 
 
 import numpy as np
 
-from .. import formats
 from ..core import Format
-from .. import imread
+from ..v2 import imread
+
+
+logger = logging.getLogger(__name__)
 
 
 # Sensor size of Lytro Illum resp. Lytro F01 light field camera sensor
@@ -45,7 +60,7 @@ DATA_CHUNKS_F01 = 3
 
 
 class LytroFormat(Format):
-    """ Base class for Lytro format.
+    """Base class for Lytro format.
     The subclasses LytroLfrFormat, LytroLfpFormat, LytroIllumRawFormat and
     LytroF01RawFormat implement the Lytro-LFR, Lytro-LFP and Lytro-RAW format
     for the Illum and original F01 camera respectively.
@@ -81,7 +96,7 @@ class LytroFormat(Format):
 
 
 class LytroIllumRawFormat(LytroFormat):
-    """ This is the Lytro Illum RAW format.
+    """This is the Lytro Illum RAW format.
     The raw format is a 10bit image format as used by the Lytro Illum
     light field camera. The format will read the specified raw file and will
     try to load a .txt or .json file with the associated meta data.
@@ -90,14 +105,14 @@ class LytroIllumRawFormat(LytroFormat):
 
     Parameters for reading
     ----------------------
-    None
+    meta_only : bool
+        Whether to only read the metadata.
     """
 
     def _can_read(self, request):
         # Check if mode and extensions are supported by the format
-        if request.mode[1] in (self.modes + "?"):
-            if request.extension in (".raw",):
-                return True
+        if request.extension in (".raw",):
+            return True
 
     @staticmethod
     def rearrange_bits(array):
@@ -135,9 +150,10 @@ class LytroIllumRawFormat(LytroFormat):
     # -- reader
 
     class Reader(Format.Reader):
-        def _open(self):
+        def _open(self, meta_only=False):
             self._file = self.request.get_file()
             self._data = None
+            self._meta_only = meta_only
 
         def _close(self):
             # Close the reader.
@@ -154,15 +170,20 @@ class LytroIllumRawFormat(LytroFormat):
             if index not in [0, "None"]:
                 raise IndexError("Lytro file contains only one dataset")
 
-            # Read all bytes
-            if self._data is None:
-                self._data = self._file.read()
+            if not self._meta_only:
+                # Read all bytes
+                if self._data is None:
+                    self._data = self._file.read()
 
-            # Read bytes from string and convert to uint16
-            raw = np.frombuffer(self._data, dtype=np.uint8).astype(np.uint16)
+                # Read bytes from string and convert to uint16
+                raw = np.frombuffer(self._data, dtype=np.uint8).astype(np.uint16)
 
-            # Rearrange bits
-            img = LytroIllumRawFormat.rearrange_bits(raw)
+                # Rearrange bits
+                img = LytroIllumRawFormat.rearrange_bits(raw)
+
+            else:
+                # Return empty image
+                img = np.array([])
 
             # Return image and meta data
             return img, self._get_meta_data(index=0)
@@ -188,12 +209,12 @@ class LytroIllumRawFormat(LytroFormat):
                 return meta_data
 
             else:
-                print("No metadata file found for provided raw file.")
+                logger.warning("No metadata file found for provided raw file.")
                 return {}
 
 
 class LytroLfrFormat(LytroFormat):
-    """ This is the Lytro Illum LFR format.
+    """This is the Lytro Illum LFR format.
     The lfr is a image and meta data container format as used by the
     Lytro Illum light field camera.
     The format will read the specified lfr file.
@@ -201,24 +222,28 @@ class LytroLfrFormat(LytroFormat):
 
     Parameters for reading
     ----------------------
-    None
+    meta_only : bool
+        Whether to only read the metadata.
+    include_thumbnail : bool
+        Whether to include an image thumbnail in the metadata.
     """
 
     def _can_read(self, request):
         # Check if mode and extensions are supported by the format
-        if request.mode[1] in (self.modes + "?"):
-            if request.extension in (".lfr",):
-                return True
+        if request.extension in (".lfr",):
+            return True
 
     # -- reader
 
     class Reader(Format.Reader):
-        def _open(self):
+        def _open(self, meta_only=False, include_thumbnail=True):
             self._file = self.request.get_file()
             self._data = None
             self._chunks = {}
             self.metadata = {}
             self._content = None
+            self._meta_only = meta_only
+            self._include_thumbnail = include_thumbnail
 
             self._find_header()
             self._find_chunks()
@@ -232,11 +257,11 @@ class LytroLfrFormat(LytroFormat):
                     and chunk_dict["imageRef"] in self._chunks
                     and chunk_dict["privateMetadataRef"] in self._chunks
                 ):
-
-                    # Read raw image data byte buffer
-                    data_pos, size = self._chunks[chunk_dict["imageRef"]]
-                    self._file.seek(data_pos, 0)
-                    self.raw_image_data = self._file.read(size)
+                    if not self._meta_only:
+                        # Read raw image data byte buffer
+                        data_pos, size = self._chunks[chunk_dict["imageRef"]]
+                        self._file.seek(data_pos, 0)
+                        self.raw_image_data = self._file.read(size)
 
                     # Read meta data
                     data_pos, size = self._chunks[chunk_dict["metadataRef"]]
@@ -254,24 +279,25 @@ class LytroLfrFormat(LytroFormat):
                     self.metadata["privateMetadata"] = self.serial_numbers
 
                 # Read image preview thumbnail
-                chunk_dict = self._content["thumbnails"][0]
-                if chunk_dict["imageRef"] in self._chunks:
-                    # Read thumbnail image from thumbnail chunk
-                    data_pos, size = self._chunks[chunk_dict["imageRef"]]
-                    self._file.seek(data_pos, 0)
-                    # Read binary data, read image as jpeg
-                    thumbnail_data = self._file.read(size)
-                    thumbnail_img = imread(thumbnail_data, format="jpeg")
+                if self._include_thumbnail:
+                    chunk_dict = self._content["thumbnails"][0]
+                    if chunk_dict["imageRef"] in self._chunks:
+                        # Read thumbnail image from thumbnail chunk
+                        data_pos, size = self._chunks[chunk_dict["imageRef"]]
+                        self._file.seek(data_pos, 0)
+                        # Read binary data, read image as jpeg
+                        thumbnail_data = self._file.read(size)
+                        thumbnail_img = imread(thumbnail_data, format="jpeg")
 
-                    thumbnail_height = chunk_dict["height"]
-                    thumbnail_width = chunk_dict["width"]
+                        thumbnail_height = chunk_dict["height"]
+                        thumbnail_width = chunk_dict["width"]
 
-                    # Add thumbnail to metadata
-                    self.metadata["thumbnail"] = {
-                        "image": thumbnail_img,
-                        "height": thumbnail_height,
-                        "width": thumbnail_width,
-                    }
+                        # Add thumbnail to metadata
+                        self.metadata["thumbnail"] = {
+                            "image": thumbnail_img,
+                            "height": thumbnail_height,
+                            "width": thumbnail_width,
+                        }
 
             except KeyError:
                 raise RuntimeError("The specified file is not a valid LFR file.")
@@ -372,9 +398,14 @@ class LytroLfrFormat(LytroFormat):
             if index not in [0, None]:
                 raise IndexError("Lytro lfr file contains only one dataset")
 
-            # Read bytes from string and convert to uint16
-            raw = np.frombuffer(self.raw_image_data, dtype=np.uint8).astype(np.uint16)
-            im = LytroIllumRawFormat.rearrange_bits(raw)
+            if not self._meta_only:
+                # Read bytes from string and convert to uint16
+                raw = np.frombuffer(self.raw_image_data, dtype=np.uint8).astype(
+                    np.uint16
+                )
+                im = LytroIllumRawFormat.rearrange_bits(raw)
+            else:
+                im = np.array([])
 
             # Return array and dummy meta data
             return im, self.metadata
@@ -389,7 +420,7 @@ class LytroLfrFormat(LytroFormat):
 
 
 class LytroF01RawFormat(LytroFormat):
-    """ This is the Lytro RAW format for the original F01 Lytro camera.
+    """This is the Lytro RAW format for the original F01 Lytro camera.
     The raw format is a 12bit image format as used by the Lytro F01
     light field camera. The format will read the specified raw file and will
     try to load a .txt or .json file with the associated meta data.
@@ -398,15 +429,15 @@ class LytroF01RawFormat(LytroFormat):
 
     Parameters for reading
     ----------------------
-    None
+    meta_only : bool
+        Whether to only read the metadata.
 
     """
 
     def _can_read(self, request):
         # Check if mode and extensions are supported by the format
-        if request.mode[1] in (self.modes + "?"):
-            if request.extension in (".raw",):
-                return True
+        if request.extension in (".raw",):
+            return True
 
     @staticmethod
     def rearrange_bits(array):
@@ -434,9 +465,10 @@ class LytroF01RawFormat(LytroFormat):
     # -- reader
 
     class Reader(Format.Reader):
-        def _open(self):
+        def _open(self, meta_only=False):
             self._file = self.request.get_file()
             self._data = None
+            self._meta_only = meta_only
 
         def _close(self):
             # Close the reader.
@@ -453,15 +485,19 @@ class LytroF01RawFormat(LytroFormat):
             if index not in [0, "None"]:
                 raise IndexError("Lytro file contains only one dataset")
 
-            # Read all bytes
-            if self._data is None:
-                self._data = self._file.read()
+            if not self._meta_only:
+                # Read all bytes
+                if self._data is None:
+                    self._data = self._file.read()
 
-            # Read bytes from string and convert to uint16
-            raw = np.frombuffer(self._data, dtype=np.uint8).astype(np.uint16)
+                # Read bytes from string and convert to uint16
+                raw = np.frombuffer(self._data, dtype=np.uint8).astype(np.uint16)
 
-            # Rearrange bits
-            img = LytroF01RawFormat.rearrange_bits(raw)
+                # Rearrange bits
+                img = LytroF01RawFormat.rearrange_bits(raw)
+
+            else:
+                img = np.array([])
 
             # Return image and meta data
             return img, self._get_meta_data(index=0)
@@ -487,12 +523,12 @@ class LytroF01RawFormat(LytroFormat):
                 return meta_data
 
             else:
-                print("No metadata file found for provided raw file.")
+                logger.warning("No metadata file found for provided raw file.")
                 return {}
 
 
 class LytroLfpFormat(LytroFormat):
-    """ This is the Lytro Illum LFP format.
+    """This is the Lytro Illum LFP format.
     The lfp is a image and meta data container format as used by the
     Lytro F01 light field camera.
     The format will read the specified lfp file.
@@ -500,24 +536,27 @@ class LytroLfpFormat(LytroFormat):
 
     Parameters for reading
     ----------------------
-    None
+    meta_only : bool
+        Whether to only read the metadata.
+    include_thumbnail : bool
+        Whether to include an image thumbnail in the metadata.
     """
 
     def _can_read(self, request):
         # Check if mode and extensions are supported by the format
-        if request.mode[1] in (self.modes + "?"):
-            if request.extension in (".lfp",):
-                return True
+        if request.extension in (".lfp",):
+            return True
 
     # -- reader
 
     class Reader(Format.Reader):
-        def _open(self):
+        def _open(self, meta_only=False):
             self._file = self.request.get_file()
             self._data = None
             self._chunks = {}
             self.metadata = {}
             self._content = None
+            self._meta_only = meta_only
 
             self._find_header()
             self._find_meta()
@@ -531,11 +570,11 @@ class LytroLfpFormat(LytroFormat):
                     and chunk_dict["imageRef"] in self._chunks
                     and chunk_dict["privateMetadataRef"] in self._chunks
                 ):
-
-                    # Read raw image data byte buffer
-                    data_pos, size = self._chunks[chunk_dict["imageRef"]]
-                    self._file.seek(data_pos, 0)
-                    self.raw_image_data = self._file.read(size)
+                    if not self._meta_only:
+                        # Read raw image data byte buffer
+                        data_pos, size = self._chunks[chunk_dict["imageRef"]]
+                        self._file.seek(data_pos, 0)
+                        self.raw_image_data = self._file.read(size)
 
                     # Read meta data
                     data_pos, size = self._chunks[chunk_dict["metadataRef"]]
@@ -654,9 +693,14 @@ class LytroLfpFormat(LytroFormat):
             if index not in [0, None]:
                 raise IndexError("Lytro lfp file contains only one dataset")
 
-            # Read bytes from string and convert to uint16
-            raw = np.frombuffer(self.raw_image_data, dtype=np.uint8).astype(np.uint16)
-            im = LytroF01RawFormat.rearrange_bits(raw)
+            if not self._meta_only:
+                # Read bytes from string and convert to uint16
+                raw = np.frombuffer(self.raw_image_data, dtype=np.uint8).astype(
+                    np.uint16
+                )
+                im = LytroF01RawFormat.rearrange_bits(raw)
+            else:
+                im = np.array([])
 
             # Return array and dummy meta data
             return im, self.metadata
@@ -668,35 +712,3 @@ class LytroLfpFormat(LytroFormat):
                 raise IndexError("Lytro meta data file contains only one dataset")
 
             return self.metadata
-
-
-# Create the formats
-SPECIAL_CLASSES = {
-    "lytro-lfr": LytroLfrFormat,
-    "lytro-illum-raw": LytroIllumRawFormat,
-    "lytro-lfp": LytroLfpFormat,
-    "lytro-f01-raw": LytroF01RawFormat,
-}
-
-# Supported Formats.
-# Only single image files supported.
-file_formats = [
-    ("LYTRO-LFR", "Lytro Illum lfr image file", "lfr", "i"),
-    ("LYTRO-ILLUM-RAW", "Lytro Illum raw image file", "raw", "i"),
-    ("LYTRO-LFP", "Lytro F01 lfp image file", "lfp", "i"),
-    ("LYTRO-F01-RAW", "Lytro F01 raw image file", "raw", "i"),
-]
-
-
-def _create_predefined_lytro_formats():
-    for name, des, ext, i in file_formats:
-        # Get format class for format
-        format_class = SPECIAL_CLASSES.get(name.lower(), LytroFormat)
-        if format_class:
-            # Create Format and add
-            format = format_class(name, des, ext, i)
-            formats.add_format(format=format)
-
-
-# Register all created formats.
-_create_predefined_lytro_formats()

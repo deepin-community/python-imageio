@@ -3,30 +3,28 @@ import sys
 import numpy as np
 
 from pytest import raises
-from imageio.testing import run_tests_if_main
 
-import imageio
+import imageio.v2 as iio
+import imageio.plugins.grab
 
 
 def test_grab_plugin_load():
-
     imageio.plugins.grab.BaseGrabFormat._ImageGrab = FakeImageGrab
     imageio.plugins.grab.BaseGrabFormat._pillow_imported = True
     _plat = sys.platform
     sys.platform = "win32"
 
     try:
-
-        reader = imageio.get_reader("<screen>")
+        reader = iio.get_reader("<screen>")
         assert reader.format.name == "SCREENGRAB"
 
-        reader = imageio.get_reader("<clipboard>")
+        reader = iio.get_reader("<clipboard>")
         assert reader.format.name == "CLIPBOARDGRAB"
 
         with raises(ValueError):
-            imageio.get_writer("<clipboard>")
+            iio.get_writer("<clipboard>")
         with raises(ValueError):
-            imageio.get_writer("<screen>")
+            iio.get_writer("<screen>")
 
     finally:
         sys.platform = _plat
@@ -35,7 +33,6 @@ def test_grab_plugin_load():
 
 
 class FakeImageGrab:
-
     has_clipboard = True
 
     @classmethod
@@ -60,11 +57,10 @@ def test_grab_simulated():
     sys.platform = "win32"
 
     try:
-
-        im = imageio.imread("<screen>")
+        im = iio.imread("<screen>")
         assert im.shape == (8, 8, 3)
 
-        reader = imageio.get_reader("<screen>")
+        reader = iio.get_reader("<screen>")
         im1 = reader.get_data(0)
         im2 = reader.get_data(0)
         im3 = reader.get_data(1)
@@ -72,10 +68,10 @@ def test_grab_simulated():
         assert im2.shape == (8, 8, 3)
         assert im3.shape == (8, 8, 3)
 
-        im = imageio.imread("<clipboard>")
+        im = iio.imread("<clipboard>")
         assert im.shape == (9, 9, 3)
 
-        reader = imageio.get_reader("<clipboard>")
+        reader = iio.get_reader("<clipboard>")
         im1 = reader.get_data(0)
         im2 = reader.get_data(0)
         im3 = reader.get_data(1)
@@ -86,13 +82,10 @@ def test_grab_simulated():
         # Grabbing from clipboard can fail if there is no image data to grab
         FakeImageGrab.has_clipboard = False
         with raises(RuntimeError):
-            im = imageio.imread("<clipboard>")
+            im = iio.imread("<clipboard>")
 
     finally:
         sys.platform = _plat
         imageio.plugins.grab.BaseGrabFormat._ImageGrab = None
         imageio.plugins.grab.BaseGrabFormat._pillow_imported = False
         FakeImageGrab.has_clipboard = True
-
-
-run_tests_if_main()

@@ -1,0 +1,34 @@
+From: Ole Streicher <olebole@debian.org>
+Date: Wed, 28 Jun 2023 22:41:37 +0200
+Subject: Skip tests that fail without ffmpeg
+
+---
+ tests/test_format.py | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/tests/test_format.py b/tests/test_format.py
+index cd81ffc..3090328 100644
+--- a/tests/test_format.py
++++ b/tests/test_format.py
+@@ -355,11 +355,10 @@ def test_preferring_arbitrary():
+     assert "NPZ" not in names[:10]
+ 
+     # But we can move them forward
+-    imageio.formats.sort("DICOM", "FFMPEG", "NPZ")
++    imageio.formats.sort("DICOM", "NPZ")
+     names = [f.name for f in imageio.formats]
+     assert names[0] == "DICOM"
+-    assert names[1] == "FFMPEG"
+-    assert names[2] == "NPZ"
++    assert names[1] == "NPZ"
+ 
+     # And back to normal ..
+     imageio.formats.sort()
+@@ -407,6 +406,7 @@ def missing_ffmpeg():
+     sys.modules["imageio.plugins.ffmpeg"] = old_plugin
+ 
+ 
++@pytest.mark.skip
+ def test_missing_format(missing_ffmpeg):
+     # regression test for
+     # https://github.com/imageio/imageio/issues/887

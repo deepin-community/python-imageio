@@ -1,55 +1,36 @@
 # -*- coding: utf-8 -*-
 # imageio is distributed under the terms of the (new) BSD License.
 
-""" 
+"""
 Various utilities for imageio
 """
 
-from __future__ import absolute_import, print_function, division
 
-
+from collections import OrderedDict
+import numpy as np
 import os
 import re
 import struct
 import sys
 import time
-from logging import warning as warn
+import logging
 
-# Make pkg_resources optional if setuptools is not available
-try:
-    import pkg_resources
-except ImportError:
-    pkg_resources = None
 
-import numpy as np
+logger = logging.getLogger("imageio")
 
 IS_PYPY = "__pypy__" in sys.builtin_module_names
 THIS_DIR = os.path.abspath(os.path.dirname(__file__))
 
-# Taken from six.py
-PY3 = sys.version_info[0] == 3
-if PY3:
-    string_types = (str,)
-    text_type = str
-    binary_type = bytes
-else:  # pragma: no cover
-    string_types = (basestring,)  # noqa
-    text_type = unicode  # noqa
-    binary_type = str
-
 
 def urlopen(*args, **kwargs):
-    """ Compatibility function for the urlopen function. Raises an
+    """Compatibility function for the urlopen function. Raises an
     RuntimeError if urlopen could not be imported (which can occur in
     frozen applications.
     """
     try:
-        from urllib2 import urlopen
+        from urllib.request import urlopen
     except ImportError:
-        try:
-            from urllib.request import urlopen  # Py3k
-        except ImportError:
-            raise RuntimeError("Could not import urlopen.")
+        raise RuntimeError("Could not import urlopen.")
     return urlopen(*args, **kwargs)
 
 
@@ -58,12 +39,12 @@ def _precision_warn(p1, p2, extra=""):
         "Lossy conversion from {} to {}. {} Convert image to {} prior to "
         "saving to suppress this warning."
     )
-    warn(t.format(p1, p2, extra, p2))
+    logger.warning(t.format(p1, p2, extra, p2))
 
 
 def image_as_uint(im, bitdepth=None):
-    """ Convert the given image to uint (default: uint8)
-    
+    """Convert the given image to uint (default: uint8)
+
     If the dtype already matches the desired format, it is returned
     as-is. If the image is float, and all values are between 0 and 1,
     the values are multiplied by np.power(2.0, bitdepth). In all other
@@ -116,7 +97,7 @@ def image_as_uint(im, bitdepth=None):
         if not np.isfinite(ma):
             raise ValueError("Maximum image value is not finite")
         if ma == mi:
-            raise ValueError("Max value == min value, ambiguous given dtype")
+            return im.astype(out_type)
         _precision_warn(dtype_str1, dtype_str2, "Range [{}, {}].".format(mi, ma))
         # Now make float copy before we scale
         im = im.astype("float64")
@@ -128,12 +109,12 @@ def image_as_uint(im, bitdepth=None):
 
 
 class Array(np.ndarray):
-    """ Array(array, meta=None)
-    
+    """Array(array, meta=None)
+
     A subclass of np.ndarray that has a meta attribute. Get the dictionary
     that contains the meta data using ``im.meta``. Convert to a plain numpy
     array using ``np.asarray(im)``.
-    
+
     """
 
     def __new__(cls, array, meta=None):
@@ -143,7 +124,7 @@ class Array(np.ndarray):
         if not (meta is None or isinstance(meta, dict)):
             raise ValueError("Array expects meta data to be a dict.")
         # Convert and return
-        meta = meta if meta is not None else {}
+        meta = meta if meta is not None else getattr(array, "meta", {})
         try:
             ob = array.view(cls)
         except AttributeError:  # pragma: no cover
@@ -153,8 +134,7 @@ class Array(np.ndarray):
         return ob
 
     def _copy_meta(self, meta):
-        """ Make a 2-level deep copy of the meta dictionary.
-        """
+        """Make a 2-level deep copy of the meta dictionary."""
         self._meta = Dict()
         for key, val in meta.items():
             if isinstance(val, dict):
@@ -163,13 +143,12 @@ class Array(np.ndarray):
 
     @property
     def meta(self):
-        """ The dict with the meta data of this image.
-        """
+        """The dict with the meta data of this image."""
         return self._meta
 
     def __array_finalize__(self, ob):
-        """ So the meta info is maintained when doing calculations with
-        the array. 
+        """So the meta info is maintained when doing calculations with
+        the array.
         """
         if isinstance(ob, Array):
             self._copy_meta(ob.meta)
@@ -177,7 +156,7 @@ class Array(np.ndarray):
             self._copy_meta({})
 
     def __array_wrap__(self, out, context=None):
-        """ So that we return a native numpy array (or scalar) when a
+        """So that we return a native numpy array (or scalar) when a
         reducting ufunc is applied (such as sum(), std(), etc.)
         """
         if not out.shape:
@@ -192,7 +171,7 @@ Image = Array  # Alias for backwards compatibility
 
 
 def asarray(a):
-    """ Pypy-safe version of np.asarray. Pypy's np.asarray consumes a
+    """Pypy-safe version of np.asarray. Pypy's np.asarray consumes a
     *lot* of memory if the given array is an ndarray subclass. This
     function does not.
     """
@@ -204,15 +183,12 @@ def asarray(a):
     return np.asarray(a)
 
 
-from collections import OrderedDict
-
-
 class Dict(OrderedDict):
-    """ A dict in which the keys can be get and set as if they were
+    """A dict in which the keys can be get and set as if they were
     attributes. Very convenient in combination with autocompletion.
-    
+
     This Dict still behaves as much as possible as a normal dict, and
-    keys can be anything that are otherwise valid keys. However, 
+    keys can be anything that are otherwise valid keys. However,
     keys that are not valid identifiers or that are names of the dict
     class (such as 'items' and 'copy') cannot be get/set as attributes.
     """
@@ -244,19 +220,19 @@ class Dict(OrderedDict):
             self[key] = val
 
     def __dir__(self):
-        isidentifier = lambda x: bool(re.match(r"[a-z_]\w*$", x, re.I))
-        names = [
-            k for k in self.keys() if (isinstance(k, string_types) and isidentifier(k))
-        ]
+        def isidentifier(x):
+            return bool(re.match(r"[a-z_]\w*$", x, re.I))
+
+        names = [k for k in self.keys() if (isinstance(k, str) and isidentifier(k))]
         return Dict.__reserved_names__ + names
 
 
 class BaseProgressIndicator(object):
-    """ BaseProgressIndicator(name)
-    
-    A progress indicator helps display the progres of a task to the
+    """BaseProgressIndicator(name)
+
+    A progress indicator helps display the progress of a task to the
     user. Progress can be pending, running, finished or failed.
-    
+
     Each task has:
       * a name - a short description of what needs to be done.
       * an action - the current action in performing the task (e.g. a subtask)
@@ -264,7 +240,7 @@ class BaseProgressIndicator(object):
       * max - max number of progress units. If 0, the progress is indefinite
       * unit - the units in which the progress is counted
       * status - 0: pending, 1: in progress, 2: finished, 3: failed
-    
+
     This class defines an abstract interface. Subclasses should implement
     _start, _stop, _update_progress(progressText), _write(message).
     """
@@ -278,10 +254,10 @@ class BaseProgressIndicator(object):
         self._last_progress_update = 0
 
     def start(self, action="", unit="", max=0):
-        """ start(action='', unit='', max=0)
-        
+        """start(action='', unit='', max=0)
+
         Start the progress. Optionally specify an action, a unit,
-        and a maxium progress value.
+        and a maximum progress value.
         """
         if self._status == 1:
             self.finish()
@@ -294,16 +270,16 @@ class BaseProgressIndicator(object):
         self._start()
 
     def status(self):
-        """ status()
-        
+        """status()
+
         Get the status of the progress - 0: pending, 1: in progress,
         2: finished, 3: failed
         """
         return self._status
 
     def set_progress(self, progress=0, force=False):
-        """ set_progress(progress=0, force=False)
-        
+        """set_progress(progress=0, force=False)
+
         Set the current progress. To avoid unnecessary progress updates
         this will only have a visual effect if the time since the last
         update is > 0.1 seconds, or if force is True.
@@ -330,15 +306,15 @@ class BaseProgressIndicator(object):
         self._update_progress(progressText)
 
     def increase_progress(self, extra_progress):
-        """ increase_progress(extra_progress)
-        
+        """increase_progress(extra_progress)
+
         Increase the progress by a certain amount.
         """
         self.set_progress(self._progress + extra_progress)
 
     def finish(self, message=None):
-        """ finish(message=None)
-        
+        """finish(message=None)
+
         Finish the progress, optionally specifying a message. This will
         not set the progress to the maximum.
         """
@@ -349,8 +325,8 @@ class BaseProgressIndicator(object):
             self._write(message)
 
     def fail(self, message=None):
-        """ fail(message=None)
-        
+        """fail(message=None)
+
         Stop the progress with a failure, optionally specifying a message.
         """
         self.set_progress(self._progress, True)  # fore update
@@ -360,8 +336,8 @@ class BaseProgressIndicator(object):
         self._write(message)
 
     def write(self, message):
-        """ write(message)
-        
+        """write(message)
+
         Write a message during progress (such as a warning).
         """
         if self.__class__ == BaseProgressIndicator:
@@ -386,8 +362,8 @@ class BaseProgressIndicator(object):
 
 
 class StdoutProgressIndicator(BaseProgressIndicator):
-    """ StdoutProgressIndicator(name)
-    
+    """StdoutProgressIndicator(name)
+
     A progress indicator that shows the progress in stdout. It
     assumes that the tty can appropriately deal with backspace
     characters.
@@ -431,12 +407,12 @@ class StdoutProgressIndicator(BaseProgressIndicator):
 
 # From pyzolib/paths.py (https://bitbucket.org/pyzo/pyzolib/src/tip/paths.py)
 def appdata_dir(appname=None, roaming=False):
-    """ appdata_dir(appname=None, roaming=False)
-    
+    """appdata_dir(appname=None, roaming=False)
+
     Get the path to the application directory, where applications are allowed
     to write user specific files (e.g. configurations). For non-user specific
     data, consider using common_appdata_dir().
-    If appname is given, a subdir is appended (and created if necessary). 
+    If appname is given, a subdir is appended (and created if necessary).
     If roaming is True, will prefer a roaming directory (Windows Vista/7).
     """
 
@@ -481,15 +457,15 @@ def appdata_dir(appname=None, roaming=False):
             appname = "." + appname.lstrip(".")  # Make it a hidden directory
         path = os.path.join(path, appname)
         if not os.path.isdir(path):  # pragma: no cover
-            os.mkdir(path)
+            os.makedirs(path, exist_ok=True)
 
     # Done
     return path
 
 
 def resource_dirs():
-    """ resource_dirs()
-    
+    """resource_dirs()
+
     Get a list of directories where imageio resources may be located.
     The first directory in this list is the "resources" directory in
     the package itself. The second directory is the appdata directory
@@ -513,16 +489,24 @@ def resource_dirs():
 
 
 def resource_package_dir():
-    """ package_dir
-    
+    """package_dir
+
     Get the resources directory in the imageio package installation
     directory.
-    
+
     Notes
     -----
     This is a convenience method that is used by `resource_dirs` and
     imageio entry point scripts.
     """
+    # Make pkg_resources optional if setuptools is not available
+    try:
+        # Avoid importing pkg_resources in the top level due to how slow it is
+        # https://github.com/pypa/setuptools/issues/510
+        import pkg_resources
+    except ImportError:
+        pkg_resources = None
+
     if pkg_resources:
         # The directory returned by `pkg_resources.resource_filename`
         # also works with eggs.
@@ -534,8 +518,8 @@ def resource_package_dir():
 
 
 def get_platform():
-    """ get_platform()
-    
+    """get_platform()
+
     Get a string that specifies the platform more specific than
     sys.platform does. The result can be: linux32, linux64, win32,
     win64, osx32, osx64. Other platforms may be added in the future.
@@ -547,6 +531,8 @@ def get_platform():
         plat = "win%i"
     elif sys.platform.startswith("darwin"):
         plat = "osx%i"
+    elif sys.platform.startswith("freebsd"):
+        plat = "freebsd%i"
     else:  # pragma: no cover
         return None
 
@@ -554,12 +540,15 @@ def get_platform():
 
 
 def has_module(module_name):
-    """Check to see if a python module is available.
-    """
-    if sys.version_info > (3,):
+    """Check to see if a python module is available."""
+    if sys.version_info > (3, 4):
         import importlib
 
-        return importlib.find_loader(module_name) is not None
+        name_parts = module_name.split(".")
+        for i in range(len(name_parts)):
+            if importlib.util.find_spec(".".join(name_parts[: i + 1])) is None:
+                return False
+        return True
     else:  # pragma: no cover
         import imp
 
