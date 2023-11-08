@@ -3,38 +3,38 @@
 from __future__ import division
 import numpy as np
 import json
+import pytest
 
-from pytest import raises
-from imageio.testing import run_tests_if_main, need_internet
-import imageio
-from imageio.core import get_remote_file, Request
+import imageio.v2 as iio
+from imageio.core import Request
+from conftest import deprecated_test
 
 
 # Set file names for test images in imageio-binaries repo
-LFR_FILENAME = "images/Ankylosaurus_&_Stegosaurus.LFR"
-THUMB_FILENAME = "images/Ankylosaurus_&_Stegosaurus_Thumbnail.jpg"
-RAW_ILLUM_FILENAME = "images/lenslet_whiteimage.RAW"
-RAW_ILLUM_META_FILENAME = "images/lenslet_whiteimage.TXT"
-LFP_FILENAME = "images/Guitar.lfp"
-RAW_F0_FILENAME = "images/IMG_0001__frame.raw"
-RAW_F0_META_FILENAME = "images/IMG_0001__frame.json"
-PNG_FILENAME = "images/chelsea.png"
+LFR_FILENAME = "Ankylosaurus_&_Stegosaurus.LFR"
+THUMB_FILENAME = "Ankylosaurus_&_Stegosaurus_Thumbnail.jpg"
+RAW_ILLUM_FILENAME = "lenslet_whiteimage.RAW"
+RAW_ILLUM_META_FILENAME = "lenslet_whiteimage.TXT"
+LFP_FILENAME = "Guitar.lfp"
+RAW_F0_FILENAME = "IMG_0001__frame.raw"
+RAW_F0_META_FILENAME = "IMG_0001__frame.json"
+PNG_FILENAME = "chelsea.png"
 
 
-def test_lytro_lfr_format():
+@deprecated_test
+def test_lytro_lfr_format(test_images):
     """
     Test basic read/write properties of LytroLfrFormat
     """
     # Get test images
-    need_internet()
-    lfr_file = get_remote_file(LFR_FILENAME)
-    raw_illum_file = get_remote_file(RAW_ILLUM_FILENAME)
-    lfp_file = get_remote_file(LFP_FILENAME)
-    raw_f01_file = get_remote_file(RAW_F0_FILENAME)
-    png_file = get_remote_file(PNG_FILENAME)
+    lfr_file = test_images / LFR_FILENAME
+    raw_illum_file = test_images / RAW_ILLUM_FILENAME
+    lfp_file = test_images / LFP_FILENAME
+    raw_f01_file = test_images / RAW_F0_FILENAME
+    png_file = test_images / PNG_FILENAME
 
     # Test lytro lfr format
-    format = imageio.formats["lytro-lfr"]
+    format = iio.formats["lytro-lfr"]
     assert format.name == "LYTRO-LFR"
     assert format.__module__.endswith("lytro")
 
@@ -42,14 +42,6 @@ def test_lytro_lfr_format():
     assert format.can_read(Request(lfr_file, "ri"))
 
     # Test cannot read, cannot write
-    assert not format.can_read(Request(lfr_file, "rv"))
-    assert not format.can_read(Request(lfr_file, "rI"))
-    assert not format.can_read(Request(lfr_file, "rV"))
-    assert not format.can_read(Request(lfp_file, "ri"))
-    assert not format.can_read(Request(raw_illum_file, "ri"))
-    assert not format.can_read(Request(raw_f01_file, "ri"))
-    assert not format.can_read(Request(png_file, "ri"))
-
     assert not format.can_write(Request(lfr_file, "wi"))
     assert not format.can_write(Request(lfp_file, "wi"))
     assert not format.can_write(Request(raw_f01_file, "wi"))
@@ -57,20 +49,20 @@ def test_lytro_lfr_format():
     assert not format.can_write(Request(png_file, "wi"))
 
 
-def test_lytro_illum_raw_format():
+@deprecated_test
+def test_lytro_illum_raw_format(test_images):
     """
     Test basic read/write properties of LytroRawFormat
     """
     # Get test images
-    need_internet()
-    lfr_file = get_remote_file(LFR_FILENAME)
-    raw_illum_file = get_remote_file(RAW_ILLUM_FILENAME)
-    lfp_file = get_remote_file(LFP_FILENAME)
-    raw_f01_file = get_remote_file(RAW_F0_FILENAME)
-    png_file = get_remote_file(PNG_FILENAME)
+    lfr_file = test_images / LFR_FILENAME
+    raw_illum_file = test_images / RAW_ILLUM_FILENAME
+    lfp_file = test_images / LFP_FILENAME
+    raw_f01_file = test_images / RAW_F0_FILENAME
+    png_file = test_images / PNG_FILENAME
 
     # Test lytro raw format
-    format = imageio.formats["lytro-illum-raw"]
+    format = iio.formats["lytro-illum-raw"]
     assert format.name == "LYTRO-ILLUM-RAW"
     assert format.__module__.endswith("lytro")
 
@@ -78,13 +70,6 @@ def test_lytro_illum_raw_format():
     assert format.can_read(Request(raw_illum_file, "ri"))
 
     # Test cannot read, cannot write
-    assert not format.can_read(Request(raw_illum_file, "rv"))
-    assert not format.can_read(Request(raw_illum_file, "rI"))
-    assert not format.can_read(Request(raw_illum_file, "rV"))
-    assert not format.can_read(Request(lfr_file, "ri"))
-    assert not format.can_read(Request(lfp_file, "ri"))
-    assert not format.can_read(Request(png_file, "ri"))
-
     assert not format.can_write(Request(raw_illum_file, "wi"))
     assert not format.can_write(Request(lfr_file, "wi"))
     assert not format.can_write(Request(lfp_file, "wi"))
@@ -92,20 +77,20 @@ def test_lytro_illum_raw_format():
     assert not format.can_write(Request(png_file, "wi"))
 
 
-def test_lytro_f01_raw_format():
+@deprecated_test
+def test_lytro_f01_raw_format(test_images):
     """
     Test basic read/write properties of LytroRawFormat
     """
     # Get test images
-    need_internet()
-    lfr_file = get_remote_file(LFR_FILENAME)
-    raw_illum_file = get_remote_file(RAW_ILLUM_FILENAME)
-    lfp_file = get_remote_file(LFP_FILENAME)
-    raw_f01_file = get_remote_file(RAW_F0_FILENAME)
-    png_file = get_remote_file(PNG_FILENAME)
+    lfr_file = test_images / LFR_FILENAME
+    raw_illum_file = test_images / RAW_ILLUM_FILENAME
+    lfp_file = test_images / LFP_FILENAME
+    raw_f01_file = test_images / RAW_F0_FILENAME
+    png_file = test_images / PNG_FILENAME
 
     # Test lytro raw format
-    format = imageio.formats["lytro-illum-raw"]
+    format = iio.formats["lytro-illum-raw"]
     assert format.name == "LYTRO-ILLUM-RAW"
     assert format.__module__.endswith("lytro")
 
@@ -113,13 +98,6 @@ def test_lytro_f01_raw_format():
     assert format.can_read(Request(raw_f01_file, "ri"))
 
     # Test cannot read, cannot write
-    assert not format.can_read(Request(raw_f01_file, "rv"))
-    assert not format.can_read(Request(raw_f01_file, "rI"))
-    assert not format.can_read(Request(raw_f01_file, "rV"))
-    assert not format.can_read(Request(lfr_file, "ri"))
-    assert not format.can_read(Request(lfp_file, "ri"))
-    assert not format.can_read(Request(png_file, "ri"))
-
     assert not format.can_write(Request(raw_f01_file, "wi"))
     assert not format.can_write(Request(lfr_file, "wi"))
     assert not format.can_write(Request(lfp_file, "wi"))
@@ -127,20 +105,20 @@ def test_lytro_f01_raw_format():
     assert not format.can_write(Request(png_file, "wi"))
 
 
-def test_lytro_lfp_format():
+@deprecated_test
+def test_lytro_lfp_format(test_images):
     """
     Test basic read/write properties of LytroRawFormat
     """
     # Get test images
-    need_internet()
-    lfr_file = get_remote_file(LFR_FILENAME)
-    raw_illum_file = get_remote_file(RAW_ILLUM_FILENAME)
-    lfp_file = get_remote_file(LFP_FILENAME)
-    raw_f01_file = get_remote_file(RAW_F0_FILENAME)
-    png_file = get_remote_file(PNG_FILENAME)
+    lfr_file = test_images / LFR_FILENAME
+    raw_illum_file = test_images / RAW_ILLUM_FILENAME
+    lfp_file = test_images / LFP_FILENAME
+    raw_f01_file = test_images / RAW_F0_FILENAME
+    png_file = test_images / PNG_FILENAME
 
     # Test lytro raw format
-    format = imageio.formats["lytro-lfp"]
+    format = iio.formats["lytro-lfp"]
     assert format.name == "LYTRO-LFP"
     assert format.__module__.endswith("lytro")
 
@@ -148,14 +126,6 @@ def test_lytro_lfp_format():
     assert format.can_read(Request(lfp_file, "ri"))
 
     # Test cannot read, cannot write
-    assert not format.can_read(Request(lfp_file, "rv"))
-    assert not format.can_read(Request(lfp_file, "rI"))
-    assert not format.can_read(Request(lfp_file, "rV"))
-    assert not format.can_read(Request(lfr_file, "ri"))
-    assert not format.can_read(Request(raw_f01_file, "ri"))
-    assert not format.can_read(Request(raw_illum_file, "ri"))
-    assert not format.can_read(Request(png_file, "ri"))
-
     assert not format.can_write(Request(lfp_file, "wi"))
     assert not format.can_write(Request(lfr_file, "wi"))
     assert not format.can_write(Request(raw_f01_file, "wi"))
@@ -163,17 +133,15 @@ def test_lytro_lfp_format():
     assert not format.can_write(Request(png_file, "wi"))
 
 
-def test_lytro_lfr_reading():
-    """ Test reading of lytro .lfr file
-    """
+def test_lytro_lfr_reading(test_images):
+    """Test reading of lytro .lfr file"""
     # Get test images
-    need_internet()
-    lfr_file = get_remote_file(LFR_FILENAME)
-    thumb_file = get_remote_file(THUMB_FILENAME)
+    lfr_file = test_images / LFR_FILENAME
+    thumb_file = test_images / THUMB_FILENAME
 
     # Read image and thumbnail
-    img = imageio.imread(lfr_file, format="lytro-lfr")
-    thumb_gt = imageio.imread(thumb_file)
+    img = iio.imread(lfr_file, format="lytro-lfr")
+    thumb_gt = iio.imread(thumb_file)
 
     # Test image shape and some pixel values
     # Pixel values are extracted from the Matlab reference implementation
@@ -231,9 +199,16 @@ def test_lytro_lfr_reading():
         "generator": "lightning",
         "schema": "http://schema.lytro.com/lfp/lytro_illum_public/"
         + "1.3.5/lytro_illum_public_schema.json",
-        "camera": {"make": "Lytro, Inc.", "model": "ILLUM", "firmware": "1.1.1 (23)"},
+        "camera": {
+            "make": "Lytro, Inc.",
+            "model": "ILLUM",
+            "firmware": "1.1.1 (23)",
+        },
         "devices": {
-            "clock": {"zuluTime": "2015-05-17T13:31:37.412Z", "isTimeValid": True},
+            "clock": {
+                "zuluTime": "2015-05-17T13:31:37.412Z",
+                "isTimeValid": True,
+            },
             "sensor": {
                 "pixelPitch": 1.4e-06,
                 "normalizedResponses": [
@@ -420,21 +395,38 @@ def test_lytro_lfr_reading():
     assert img._meta["metadata"] == metadata_gt
     assert img._meta["privateMetadata"] == private_metadata_gt
 
+    # Read metadata only (with thumbnail)
+    img = iio.imread(lfr_file, format="lytro-lfr", meta_only=True)
+    assert np.array_equal(img, [])
+    assert img._meta["metadata"] == metadata_gt
+    assert img._meta["privateMetadata"] == private_metadata_gt
+    assert np.array_equal(img._meta["thumbnail"]["image"], thumb_gt)
+
+    # Read metadata only (without thumbnail)
+    img = iio.imread(
+        lfr_file, format="lytro-lfr", meta_only=True, include_thumbnail=False
+    )
+    assert np.array_equal(img, [])
+    assert img._meta["metadata"] == metadata_gt
+    assert img._meta["privateMetadata"] == private_metadata_gt
+    assert "thumbnail" not in img._meta.keys()
+
     # Test fail
-    test_reader = imageio.read(lfr_file, "lytro-lfr")
-    raises(IndexError, test_reader.get_data, -1)
-    raises(IndexError, test_reader.get_data, 3)
+    test_reader = iio.read(lfr_file, "lytro-lfr")
+    with pytest.raises(IndexError):
+        test_reader.get_data(-1)
+
+    with pytest.raises(IndexError):
+        test_reader.get_data(3)
 
 
-def test_lytro_lfp_reading():
-    """ Test reading of lytro .lfr file
-    """
+def test_lytro_lfp_reading(test_images):
+    """Test reading of lytro .lfr file"""
     # Get test images
-    need_internet()
-    lfp_file = get_remote_file(LFP_FILENAME)
+    lfp_file = test_images / LFP_FILENAME
 
     # Read image and thumbnail
-    img = imageio.imread(lfp_file, format="lytro-lfp")
+    img = iio.imread(lfp_file, format="lytro-lfp")
 
     # Test image shape and some pixel values
     # Pixel values are extracted from the Matlab reference implementation
@@ -539,8 +531,16 @@ def test_lytro_lfp_reading():
         "modes": {
             "creative": "tap",
             "regionOfInterestArray": [
-                {"type": "exposure", "x": 0.5125047564506531, "y": 0.723964273929596},
-                {"type": "creative", "x": 0.5125047564506531, "y": 0.723964273929596},
+                {
+                    "type": "exposure",
+                    "x": 0.5125047564506531,
+                    "y": 0.723964273929596,
+                },
+                {
+                    "type": "creative",
+                    "x": 0.5125047564506531,
+                    "y": 0.723964273929596,
+                },
             ],
             "manualControls": False,
             "exposureDurationMode": "auto",
@@ -565,22 +565,28 @@ def test_lytro_lfp_reading():
     assert img._meta["metadata"] == metadata_gt
     assert img._meta["privateMetadata"] == private_metadata_gt
 
+    # Read metadata only
+    img = iio.imread(lfp_file, format="lytro-lfp", meta_only=True)
+    assert np.array_equal(img, [])
+    assert img._meta["metadata"] == metadata_gt
+    assert img._meta["privateMetadata"] == private_metadata_gt
+
     # Test fail
-    test_reader = imageio.read(lfp_file, "lytro-lfp")
-    raises(IndexError, test_reader.get_data, -1)
-    raises(IndexError, test_reader.get_data, 3)
+    test_reader = iio.read(lfp_file, "lytro-lfp")
+    with pytest.raises(IndexError):
+        test_reader.get_data(-1)
+    with pytest.raises(IndexError):
+        test_reader.get_data(3)
 
 
-def test_lytro_raw_illum_reading():
-    """ Test reading of lytro .raw file
-    """
+def test_lytro_raw_illum_reading(test_images):
+    """Test reading of lytro .raw file"""
     # Get test images
-    need_internet()
-    raw_file = get_remote_file(RAW_ILLUM_FILENAME)
-    raw_meta_file = get_remote_file(RAW_ILLUM_META_FILENAME)
+    raw_file = test_images / RAW_ILLUM_FILENAME
+    raw_meta_file = test_images / RAW_ILLUM_META_FILENAME
 
     # Read image and metadata file
-    img = imageio.imread(raw_file, format="lytro-illum-raw")
+    img = iio.imread(raw_file, format="lytro-illum-raw")
     meta_gt = json.load(open(raw_meta_file))
 
     # Test image shape and some pixel values
@@ -599,22 +605,28 @@ def test_lytro_raw_illum_reading():
     # Test extracted metadata against extracted metadata from .txt file
     assert img._meta == meta_gt
 
+    # Read metadata only
+    img = iio.imread(raw_file, format="lytro-illum-raw", meta_only=True)
+    assert np.array_equal(img, [])
+    assert img._meta == meta_gt
+
     # Test fail
-    test_reader = imageio.read(raw_file, "lytro-illum-raw")
-    raises(IndexError, test_reader.get_data, -1)
-    raises(IndexError, test_reader.get_data, 3)
+    test_reader = iio.read(raw_file, "lytro-illum-raw")
+    with pytest.raises(IndexError):
+        test_reader.get_data(-1)
+
+    with pytest.raises(IndexError):
+        test_reader.get_data(3)
 
 
-def test_lytro_raw_f0_reading():
-    """ Test reading of lytro .raw file
-    """
+def test_lytro_raw_f0_reading(test_images):
+    """Test reading of lytro .raw file"""
     # Get test images
-    need_internet()
-    raw_file = get_remote_file(RAW_F0_FILENAME)
-    raw_meta_file = get_remote_file(RAW_F0_META_FILENAME)
+    raw_file = test_images / RAW_F0_FILENAME
+    raw_meta_file = test_images / RAW_F0_META_FILENAME
 
     # Read image and metadata file
-    img = imageio.imread(raw_file, format="lytro-f01-raw")
+    img = iio.imread(raw_file, format="lytro-f01-raw")
     meta_gt = json.load(open(raw_meta_file))
 
     # Test image shape and some pixel values
@@ -633,10 +645,15 @@ def test_lytro_raw_f0_reading():
     # Test extracted metadata against extracted metadata from .txt file
     assert img._meta == meta_gt
 
+    # Read metadata only
+    img = iio.imread(raw_file, format="lytro-f01-raw", meta_only=True)
+    assert np.array_equal(img, [])
+    assert img._meta == meta_gt
+
     # Test fail
-    test_reader = imageio.read(raw_file, "lytro-f01-raw")
-    raises(IndexError, test_reader.get_data, -1)
-    raises(IndexError, test_reader.get_data, 3)
+    test_reader = iio.read(raw_file, "lytro-f01-raw")
+    with pytest.raises(IndexError):
+        test_reader.get_data(-1)
 
-
-run_tests_if_main()
+    with pytest.raises(IndexError):
+        test_reader.get_data(3)

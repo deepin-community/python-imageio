@@ -1,4 +1,4 @@
 Use-the-system-libraries.patch
-skip_test_accessing_remote_URL.patch
-skip_failing_test.patch
-xfail_big-endian.patch
+Skip-tests-that-fail-without-ffmpeg.patch
+Skip-test-that-fails-for-unknown-reason.patch
+Disable-test_8bit_with_16bit_depth-that-fails-on-big-endi.patch

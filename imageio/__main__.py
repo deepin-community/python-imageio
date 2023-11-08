@@ -1,7 +1,6 @@
-""" 
+"""
 Console scripts and associated helper methods for imageio.
 """
-from __future__ import print_function
 
 import argparse
 import os
@@ -15,16 +14,16 @@ from .core import util
 
 # A list of plugins that require binaries from the imageio-binaries
 # repository. These plugins must implement the `download` method.
-PLUGINS_WITH_BINARIES = ["avbin", "ffmpeg", "freeimage"]
+PLUGINS_WITH_BINARIES = ["freeimage"]
 
 
 def download_bin(plugin_names=["all"], package_dir=False):
-    """ Download binary dependencies of plugins
-    
+    """Download binary dependencies of plugins
+
     This is a convenience method for downloading the binaries
-    (e.g. `ffmpeg.win32.exe` for Windows) from the imageio-binaries
+    (e.g. for freeimage) from the imageio-binaries
     repository.
-    
+
     Parameters
     ----------
     plugin_names: list
@@ -63,7 +62,7 @@ def download_bin(plugin_names=["all"], package_dir=False):
 
 
 def download_bin_main():
-    """ Argument-parsing wrapper for `download_bin` """
+    """Argument-parsing wrapper for `download_bin`"""
     description = "Download plugin binary dependencies"
     phelp = (
         "Plugin name for which to download the binary. "
@@ -77,8 +76,7 @@ def download_bin_main():
     example_text = (
         "examples:\n"
         + "  imageio_download_bin all\n"
-        + "  imageio_download_bin ffmpeg\n"
-        + "  imageio_download_bin avbin ffmpeg\n"
+        + "  imageio_download_bin freeimage\n"
     )
     parser = argparse.ArgumentParser(
         description=description,
@@ -98,11 +96,11 @@ def download_bin_main():
 
 
 def remove_bin(plugin_names=["all"]):
-    """ Remove binary dependencies of plugins
-    
+    """Remove binary dependencies of plugins
+
     This is a convenience method that removes all binaries
     dependencies for plugins downloaded by imageio.
-    
+
     Notes
     -----
     It only makes sense to use this method if the binaries
@@ -141,7 +139,7 @@ def remove_bin(plugin_names=["all"]):
 
 
 def remove_bin_main():
-    """ Argument-parsing wrapper for `remove_bin` """
+    """Argument-parsing wrapper for `remove_bin`"""
     description = "Remove plugin binary dependencies"
     phelp = (
         "Plugin name for which to remove the binary. "
@@ -150,8 +148,7 @@ def remove_bin_main():
     example_text = (
         "examples:\n"
         + "  imageio_remove_bin all\n"
-        + "  imageio_remove_bin ffmpeg\n"
-        + "  imageio_remove_bin avbin ffmpeg\n"
+        + "  imageio_remove_bin freeimage\n"
     )
     parser = argparse.ArgumentParser(
         description=description,

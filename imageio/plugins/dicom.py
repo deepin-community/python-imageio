@@ -1,7 +1,36 @@
 # -*- coding: utf-8 -*-
 # imageio is distributed under the terms of the (new) BSD License.
 
-""" Plugin for reading DICOM files.
+"""Read DICOM files.
+
+Backend Library: internal
+
+A format for reading DICOM images: a common format used to store
+medical image data, such as X-ray, CT and MRI.
+
+This format borrows some code (and ideas) from the pydicom project. However,
+only a predefined subset of tags are extracted from the file. This allows
+for great simplifications allowing us to make a stand-alone reader, and
+also results in a much faster read time.
+
+By default, only uncompressed and deflated transfer syntaxes are supported.
+If gdcm or dcmtk is installed, these will be used to automatically convert
+the data. See https://github.com/malaterre/GDCM/releases for installing GDCM.
+
+This format provides functionality to group images of the same
+series together, thus extracting volumes (and multiple volumes).
+Using volread will attempt to yield a volume. If multiple volumes
+are present, the first one is given. Using mimread will simply yield
+all images in the given directory (not taking series into account).
+
+Parameters
+----------
+progress : {True, False, BaseProgressIndicator}
+    Whether to show progress when reading from multiple files.
+    Default True. By passing an object that inherits from
+    BaseProgressIndicator, the way in which progress is reported
+    can be costumized.
+
 """
 
 # todo: Use pydicom:
@@ -12,17 +41,17 @@
 # file: speed still high
 # * Perhaps allow writing?
 
-from __future__ import absolute_import, print_function, division
-
 import os
 import sys
+import logging
 import subprocess
 
-from .. import formats
 from ..core import Format, BaseProgressIndicator, StdoutProgressIndicator
 from ..core import read_n_bytes
 
 _dicom = None  # lazily loaded in load_lib()
+
+logger = logging.getLogger(__name__)
 
 
 def load_lib():
@@ -46,42 +75,52 @@ def get_dcmdjpeg_exe():
     ):
         filename = os.path.join(dir, fname)
         if os.path.isfile(filename):
-            return filename
+            return [filename]
 
     try:
-        subprocess.check_call([fname, "--version"], shell=True)
-        return fname
+        subprocess.check_call([fname, "--version"])
+        return [fname]
     except Exception:
         return None
 
 
+def get_gdcmconv_exe():
+    fname = "gdcmconv" + ".exe" * sys.platform.startswith("win")
+    # Maybe it's on the path
+    try:
+        subprocess.check_call([fname, "--version"])
+        return [fname, "--raw"]
+    except Exception:
+        pass
+    # Select directories where it could be
+    candidates = []
+    base_dirs = [r"c:\Program Files"]
+    for base_dir in base_dirs:
+        if os.path.isdir(base_dir):
+            for dname in os.listdir(base_dir):
+                if dname.lower().startswith("gdcm"):
+                    suffix = dname[4:].strip()
+                    candidates.append((suffix, os.path.join(base_dir, dname)))
+    # Sort, so higher versions are tried earlier
+    candidates.sort(reverse=True)
+    # Select executable
+    filename = None
+    for _, dirname in candidates:
+        exe1 = os.path.join(dirname, "gdcmconv.exe")
+        exe2 = os.path.join(dirname, "bin", "gdcmconv.exe")
+        if os.path.isfile(exe1):
+            filename = exe1
+            break
+        if os.path.isfile(exe2):
+            filename = exe2
+            break
+    else:
+        return None
+    return [filename, "--raw"]
+
+
 class DicomFormat(Format):
-    """ A format for reading DICOM images: a common format used to store
-    medical image data, such as X-ray, CT and MRI.
-    
-    This format borrows some code (and ideas) from the pydicom project,
-    and (to the best of our knowledge) has the same limitations as
-    pydicom with regard to the type of files that it can handle. However,
-    only a predefined subset of tags are extracted from the file. This allows
-    for great simplifications allowing us to make a stand-alone reader, and
-    also results in a much faster read time. We plan to allow reading all
-    tags in the future (by using pydicom).
-    
-    This format provides functionality to group images of the same
-    series together, thus extracting volumes (and multiple volumes).
-    Using volread will attempt to yield a volume. If multiple volumes
-    are present, the first one is given. Using mimread will simply yield
-    all images in the given directory (not taking series into account).
-    
-    Parameters for reading
-    ----------------------
-    progress : {True, False, BaseProgressIndicator}
-        Whether to show progress when reading from multiple files.
-        Default True. By passing an object that inherits from
-        BaseProgressIndicator, the way in which progress is reported
-        can be costumized.
-    
-    """
+    """See :mod:`imageio.plugins.dicom`"""
 
     def _can_read(self, request):
         # If user URI was a directory, we check whether it has a DICOM file
@@ -106,6 +145,8 @@ class DicomFormat(Format):
     # --
 
     class Reader(Format.Reader):
+        _compressed_warning_dirs = set()
+
         def _open(self, progress=True):
             if not _dicom:
                 load_lib()
@@ -118,23 +159,32 @@ class DicomFormat(Format):
                 try:
                     dcm = _dicom.SimpleDicomReader(self.request.get_file())
                 except _dicom.CompressedDicom as err:
-                    if "JPEG" in str(err):
-                        exe = get_dcmdjpeg_exe()
-                        if not exe:
-                            raise
+                    # We cannot do this on our own. Perhaps with some help ...
+                    cmd = get_gdcmconv_exe()
+                    if not cmd and "JPEG" in str(err):
+                        cmd = get_dcmdjpeg_exe()
+                    if not cmd:
+                        msg = err.args[0].replace("using", "installing")
+                        msg = msg.replace("convert", "auto-convert")
+                        err.args = (msg,)
+                        raise
+                    else:
                         fname1 = self.request.get_local_filename()
                         fname2 = fname1 + ".raw"
                         try:
-                            subprocess.check_call([exe, fname1, fname2], shell=True)
+                            subprocess.check_call(cmd + [fname1, fname2])
                         except Exception:
                             raise err
-                        print(
-                            "DICOM file contained compressed data. "
-                            "Used dcmtk to convert it."
-                        )
+                        d = os.path.dirname(fname1)
+                        if d not in self._compressed_warning_dirs:
+                            self._compressed_warning_dirs.add(d)
+                            logger.warning(
+                                "DICOM file contained compressed data. "
+                                + "Autoconverting with "
+                                + cmd[0]
+                                + " (this warning is shown once for each directory)"
+                            )
                         dcm = _dicom.SimpleDicomReader(fname2)
-                    else:
-                        raise
 
                 self._info = dcm._info
                 self._data = dcm.get_numpy_array()
@@ -197,6 +247,17 @@ class DicomFormat(Format):
             else:
                 raise RuntimeError("DICOM plugin should know what to expect.")
 
+        def _get_slice_data(self, index):
+            nslices = self._data.shape[0] if (self._data.ndim == 3) else 1
+
+            # Allow index >1 only if this file contains >1
+            if nslices > 1:
+                return self._data[index], self._info
+            elif index == 0:
+                return self._data, self._info
+            else:
+                raise IndexError("Dicom file contains only one slice.")
+
         def _get_data(self, index):
             if self._data is None:
                 dcm = self.series[0][0]
@@ -206,13 +267,7 @@ class DicomFormat(Format):
             nslices = self._data.shape[0] if (self._data.ndim == 3) else 1
 
             if self.request.mode[1] == "i":
-                # Allow index >1 only if this file contains >1
-                if nslices > 1:
-                    return self._data[index], self._info
-                elif index == 0:
-                    return self._data, self._info
-                else:
-                    raise IndexError("Dicom file contains only one slice.")
+                return self._get_slice_data(index)
             elif self.request.mode[1] == "I":
                 # Return slice from volume, or return item from series
                 if index == 0 and nslices > 1:
@@ -231,8 +286,19 @@ class DicomFormat(Format):
                         self.series[index].get_numpy_array(),
                         self.series[index].info,
                     )
-            else:  # pragma: no cover
-                raise ValueError("DICOM plugin should know what to expect.")
+            # mode is `?` (typically because we are using V3). If there is a
+            # series (multiple files), index referrs to the element of the
+            # series and we read volumes. If there is no series, index
+            # referrs to the slice in the volume we read "flat" images.
+            elif len(self.series) > 1:
+                # mode is `?` and there are multiple series. Each series is a ndimage.
+                return (
+                    self.series[index].get_numpy_array(),
+                    self.series[index].info,
+                )
+            else:
+                # mode is `?` and there is only one series. Each slice is an ndimage.
+                return self._get_slice_data(index)
 
         def _get_meta_data(self, index):
             if self._data is None:
@@ -265,14 +331,3 @@ class DicomFormat(Format):
                     return self.series[index].info
             else:  # pragma: no cover
                 raise ValueError("DICOM plugin should know what to expect.")
-
-
-# Add this format
-formats.add_format(
-    DicomFormat(
-        "DICOM",
-        "Digital Imaging and Communications in Medicine",
-        ".dcm .ct .mri",
-        "iIvV",
-    )
-)  # Often DICOM files have weird or no extensions

@@ -1,20 +1,58 @@
 # -*- coding: utf-8 -*-
 # imageio is distributed under the terms of the (new) BSD License.
 
-""" SWF plugin. Most of the actual work is done in _swf.py.
-"""
+""" Read/Write SWF files.
 
-from __future__ import absolute_import, print_function, division
+Backend: internal
+
+Shockwave flash (SWF) is a media format designed for rich and
+interactive animations. This plugin makes use of this format to
+store a series of images in a lossless format with good compression
+(zlib). The resulting images can be shown as an animation using
+a flash player (such as the browser).
+
+SWF stores images in RGBA format. RGB or grayscale images are
+automatically converted. SWF does not support meta data.
+
+Parameters for reading
+----------------------
+loop : bool
+    If True, the video will rewind as soon as a frame is requested
+    beyond the last frame. Otherwise, IndexError is raised. Default False.
+
+Parameters for saving
+---------------------
+fps : int
+    The speed to play the animation. Default 12.
+loop : bool
+    If True, add a tag to the end of the file to play again from
+    the first frame. Most flash players will then play the movie
+    in a loop. Note that the imageio SWF Reader does not check this
+    tag. Default True.
+html : bool
+    If the output is a file on the file system, write an html file
+    (in HTML5) that shows the animation. Default False.
+compress : bool
+    Whether to compress the swf file. Default False. You probably don't
+    want to use this. This does not decrease the file size since
+    the images are already compressed. It will result in slower
+    read and write time. The only purpose of this feature is to
+    create compressed SWF files, so that we can test the
+    functionality to read them.
+
+"""
 
 import os
 import zlib
+import logging
 from io import BytesIO
 
 import numpy as np
 
-from .. import formats
 from ..core import Format, read_n_bytes, image_as_uint
 
+
+logger = logging.getLogger(__name__)
 
 _swf = None  # lazily loaded in lib()
 
@@ -27,52 +65,16 @@ def load_lib():
 
 
 class SWFFormat(Format):
-    """ Shockwave flash (SWF) is a media format designed for rich and
-    interactive animations. This plugin makes use of this format to
-    store a series of images in a lossless format with good compression
-    (zlib). The resulting images can be shown as an animation using
-    a flash player (such as the browser).
-    
-    SWF stores images in RGBA format. RGB or grayscale images are
-    automatically converted. SWF does not support meta data.
-    
-    Parameters for reading
-    ----------------------
-    loop : bool
-        If True, the video will rewind as soon as a frame is requested
-        beyond the last frame. Otherwise, IndexError is raised. Default False.
-    
-    Parameters for saving
-    ---------------------
-    fps : int
-        The speed to play the animation. Default 12.
-    loop : bool
-        If True, add a tag to the end of the file to play again from
-        the first frame. Most flash players will then play the movie
-        in a loop. Note that the imageio SWF Reader does not check this
-        tag. Default True.
-    html : bool
-        If the output is a file on the file system, write an html file
-        (in HTML5) that shows the animation. Default False.
-    compress : bool
-        Whether to compress the swf file. Default False. You probably don't
-        want to use this. This does not decrease the file size since
-        the images are already compressed. It will result in slower
-        read and write time. The only purpose of this feature is to
-        create compressed SWF files, so that we can test the
-        functionality to read them.
-    """
+    """See :mod:`imageio.plugins.swf`"""
 
     def _can_read(self, request):
-        if request.mode[1] in (self.modes + "?"):
-            tmp = request.firstbytes[0:3].decode("ascii", "ignore")
-            if tmp in ("FWS", "CWS"):
-                return True
+        tmp = request.firstbytes[0:3].decode("ascii", "ignore")
+        if tmp in ("FWS", "CWS"):
+            return True
 
     def _can_write(self, request):
-        if request.mode[1] in (self.modes + "?"):
-            if request.extension in self.extensions:
-                return True
+        if request.extension in self.extensions:
+            return True
 
     # -- reader
 
@@ -178,7 +180,7 @@ class SWFFormat(Format):
                 return im, {}
 
         def _read_one_tag(self):
-            """ 
+            """
             Return (True, loc, size, T, L1) if an image that we can read.
             Return (False, loc, size, T, L1) if any other tag.
             """
@@ -205,7 +207,7 @@ class SWFFormat(Format):
                 isimage = True
                 # im = _swf.read_pixels(bb, 0, T, L1)  # can be None
             elif T in [6, 21, 35, 90]:  # pragma: no cover
-                print("Ignoring JPEG image: cannot read JPEG.")
+                logger.warning("Ignoring JPEG image: cannot read JPEG.")
             else:
                 pass  # Not an image tag
 
@@ -332,12 +334,3 @@ HTML = """
     <embed width="%i" height="%i" src="%s">
 </html>
 """
-
-# Register. You register an *instance* of a Format class. Here specify:
-format = SWFFormat(
-    "swf",  # shot name
-    "Shockwave flash",  # one line descr.
-    ".swf",  # list of extensions as a space separated string
-    "I",  # modes, characters in iIvV
-)
-formats.add_format(format)

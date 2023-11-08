@@ -2,19 +2,15 @@
 PIL-based formats to take screenshots and grab from the clipboard.
 """
 
-from __future__ import absolute_import, print_function, division
-
 import threading
 
 import numpy as np
 
-from .. import formats
 from ..core import Format
 
 
 class BaseGrabFormat(Format):
-    """ Base format for grab formats.
-    """
+    """Base format for grab formats."""
 
     _pillow_imported = False
     _ImageGrab = None
@@ -53,20 +49,18 @@ class BaseGrabFormat(Format):
 
 
 class ScreenGrabFormat(BaseGrabFormat):
-    """ The ScreenGrabFormat provided a means to grab screenshots using
+    """The ScreenGrabFormat provided a means to grab screenshots using
     the uri of "<screen>".
-    
+
     This functionality is provided via Pillow. Note that "<screen>" is
     only supported on Windows and OS X.
-    
+
     Parameters for reading
     ----------------------
     No parameters.
     """
 
     def _can_read(self, request):
-        if request.mode[1] not in "i?":
-            return False
         if request.filename != "<screen>":
             return False
         return bool(self._init_pillow())
@@ -82,20 +76,18 @@ class ScreenGrabFormat(BaseGrabFormat):
 
 
 class ClipboardGrabFormat(BaseGrabFormat):
-    """ The ClipboardGrabFormat provided a means to grab image data from
+    """The ClipboardGrabFormat provided a means to grab image data from
     the clipboard, using the uri "<clipboard>"
-    
+
     This functionality is provided via Pillow. Note that "<clipboard>" is
     only supported on Windows.
-    
+
     Parameters for reading
     ----------------------
     No parameters.
     """
 
     def _can_read(self, request):
-        if request.mode[1] not in "i?":
-            return False
         if request.filename != "<clipboard>":
             return False
         return bool(self._init_pillow())
@@ -111,15 +103,3 @@ class ClipboardGrabFormat(BaseGrabFormat):
             )
         im = np.asarray(pil_im)
         return im, {}
-
-
-# Register. You register an *instance* of a Format class.
-format = ScreenGrabFormat(
-    "screengrab", "Grab screenshots (Windows and OS X only)", [], "i"
-)
-formats.add_format(format)
-
-format = ClipboardGrabFormat(
-    "clipboardgrab", "Grab from clipboard (Windows only)", [], "i"
-)
-formats.add_format(format)

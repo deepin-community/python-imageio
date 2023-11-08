@@ -8,13 +8,12 @@ import sys
 import subprocess
 
 from pytest import raises  # noqa
-from imageio.testing import run_tests_if_main
 
 import imageio
 
 
 def run_subprocess(command, return_code=False, **kwargs):
-    """ Run command in subprocess and return stdout and stderr.
+    """Run command in subprocess and return stdout and stderr.
     Raise CalledProcessError if the process returned non-zero.
     """
     use_kwargs = dict(stderr=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -30,7 +29,7 @@ def run_subprocess(command, return_code=False, **kwargs):
 
 
 def loaded_modules(import_module, depth=None, all_modules=False):
-    """ Import the given module in subprocess and return set of loaded modules
+    """Import the given module in subprocess and return set of loaded modules
 
     Import a certain module in a clean subprocess and return the
     modules that are subsequently loaded. The given depth indicates the
@@ -66,7 +65,7 @@ def loaded_modules(import_module, depth=None, all_modules=False):
 
 
 def test_namespace():
-    """ Test that all names from the public API are in the main namespace """
+    """Test that all names from the public API are in the main namespace"""
 
     has_names = dir(imageio)
     has_names = set([n for n in has_names if not n.startswith("_")])
@@ -82,20 +81,15 @@ def test_namespace():
     # Check that all names are there
     assert need_names.issubset(has_names)
 
-    # Check that there are no extra names
-    extra_names = has_names.difference(need_names)
-    extra_names.discard("testing")  # can be there during testing
-    assert extra_names == {"core", "plugins", "show_formats"}
-
 
 def test_import_nothing():
-    """ Not importing imageio should not import any imageio modules. """
+    """Not importing imageio should not import any imageio modules."""
     modnames = loaded_modules("os", 2)
     assert modnames == set()
 
 
 def test_import_modules():
-    """ Test that importing imageio does not import modules that should
+    """Test that importing imageio does not import modules that should
     not be imported.
     """
     modnames = loaded_modules("imageio", 3)
@@ -103,59 +97,7 @@ def test_import_modules():
     # Test if everything seems to be there
     assert "imageio.core" in modnames
     assert "imageio.plugins" in modnames
-    assert "imageio.plugins.ffmpeg" in modnames
-    assert "imageio.plugins.dicom" in modnames
 
     # Test that modules that should not be imported are indeed not imported
     assert "imageio.freeze" not in modnames
     assert "imageio.testing" not in modnames
-
-
-def test_import_dependencies():
-    """ Test that importing imageio is not dragging in anything other
-    than the known dependencies.
-    """
-
-    # Get loaded modules when numpy is imported and when imageio is imported
-    modnames_ref = loaded_modules("numpy", 1, True)
-    modnames_new = loaded_modules("imageio", 1, True)
-
-    # Get the difference; what do we import extra?
-    extra_modules = modnames_new.difference(modnames_ref)
-
-    known_modules = [
-        "zipfile",
-        "importlib",
-        "logging",
-        "json",
-        "decimal",
-        "fractions",
-        "pkg_resources",
-        "email",
-        "tempfile",
-        "distutils",
-        "urllib",
-    ]  # discard these
-
-    # Remove modules in standard library
-    stdloc = os.path.dirname(os.__file__)
-    print("os", stdloc)
-    for modname in list(extra_modules):
-        mod = sys.modules[modname]
-        if modname.startswith("_") or modname in known_modules:
-            extra_modules.discard(modname)
-        elif not hasattr(mod, "__file__"):
-            extra_modules.discard(modname)  # buildin module
-        elif os.path.splitext(mod.__file__)[1] in (".so", ".dylib", ".pyd"):
-            extra_modules.discard(modname)  # buildin module
-        elif os.path.dirname(mod.__file__) == stdloc:
-            extra_modules.discard(modname)
-        else:
-            print(modname, mod.__file__)
-
-    # Check that only imageio is left (Windows needs a little help)
-    extra_modules.difference_update(["pythoncom", "pywintypes", "win32com"])
-    assert extra_modules == {"imageio"}
-
-
-run_tests_if_main()
