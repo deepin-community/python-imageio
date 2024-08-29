@@ -53,11 +53,14 @@ fsspec[github]
 gdal
 imageio-ffmpeg
 itk
+numpy>2
 numpydoc
+pillow-heif
 psutil
 pydata-sphinx-theme
 pytest
 pytest-cov
+rawpy
 sphinx<6
 tifffile
 wheel
@@ -78,8 +81,15 @@ flake8
 
 [pillow]
 
+[pillow-heif]
+pillow-heif
+
 [pyav]
 av
+
+[rawpy]
+rawpy
+numpy>2
 
 [simpleitk]
 

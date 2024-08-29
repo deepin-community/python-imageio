@@ -91,6 +91,7 @@ imageio/plugins/pillow_info.py
 imageio/plugins/pillow_legacy.py
 imageio/plugins/pillowmulti.py
 imageio/plugins/pyav.py
+imageio/plugins/rawpy.py
 imageio/plugins/simpleitk.py
 imageio/plugins/spe.py
 imageio/plugins/swf.py
@@ -117,6 +118,7 @@ tests/test_opencv.py
 tests/test_pillow.py
 tests/test_pillow_legacy.py
 tests/test_pyav.py
+tests/test_rawpy.py
 tests/test_simpleitk.py
 tests/test_spe.py
 tests/test_swf.py

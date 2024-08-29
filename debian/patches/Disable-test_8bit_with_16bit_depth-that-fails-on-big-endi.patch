@@ -8,7 +8,7 @@ https://github.com/imageio/imageio/issues/1016
  1 file changed, 1 insertion(+)
 
 diff --git a/tests/test_pillow.py b/tests/test_pillow.py
-index a50662c..e9e8a12 100644
+index 6127078..6941e6b 100644
 --- a/tests/test_pillow.py
 +++ b/tests/test_pillow.py
 @@ -637,6 +637,7 @@ def test_write_format_warning(test_images):

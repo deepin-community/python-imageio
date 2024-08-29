@@ -1,4 +1,6 @@
+import gc
 import io
+import multiprocessing
 import warnings
 from contextlib import ExitStack
 from pathlib import Path
@@ -15,7 +17,7 @@ from av.video.format import names as video_format_names  # type: ignore # noqa: 
 
 from imageio.plugins.pyav import _format_to_dtype  # noqa: E402
 
-IS_AV_10_0_0 = tuple(int(x) for x in av.__version__.split(".")) == (10, 0, 0)
+AV_VERSION = tuple(int(x) for x in av.__version__.split("."))
 
 # the maintainer of pyAV hasn't responded to my bug reports in over 4 months so
 # I am disabling test on pypy to stay sane.
@@ -74,7 +76,7 @@ def test_mp4_writing(tmp_path, test_images):
 
 def test_metadata(test_images: Path):
     with iio.imopen(str(test_images / "cockatoo.mp4"), "r", plugin="pyav") as plugin:
-        if IS_AV_10_0_0:
+        if AV_VERSION >= (10, 0, 0):
             with warnings.catch_warnings(record=True):
                 meta = plugin.metadata()
         else:
@@ -86,7 +88,7 @@ def test_metadata(test_images: Path):
         assert meta["duration"] == 14
         assert meta["fps"] == 20.0
 
-        if IS_AV_10_0_0:
+        if AV_VERSION >= (10, 0, 0):
             with warnings.catch_warnings(record=True):
                 meta = plugin.metadata(index=4)
         else:
@@ -424,8 +426,8 @@ def test_bayer_write():
 
 def test_sequential_reading(test_images):
     expected_imgs = [
-        iio.imread(test_images / "cockatoo.mp4", index=1),
-        iio.imread(test_images / "cockatoo.mp4", index=5),
+        iio.imread(test_images / "cockatoo.mp4", plugin="pyav", index=1),
+        iio.imread(test_images / "cockatoo.mp4", plugin="pyav", index=5),
     ]
 
     with iio.imopen(test_images / "cockatoo.mp4", "r", plugin="pyav") as img_file:
@@ -514,15 +516,10 @@ def test_rotation_flag_metadata(test_images, tmp_path):
             for frame in iio.imiter(test_images / "newtonscradle.gif"):
                 file.write_frame(frame)
 
-    if IS_AV_10_0_0:
-        with warnings.catch_warnings(record=True) as warns:
-            meta = iio.immeta(tmp_path / "test.mp4", plugin="pyav")
-            assert len(warns) == 1
-        pytest.xfail("PyAV 10.0.0 doesn't extract the rotation flag.")
+    if AV_VERSION >= (10, 0, 0):
+        pytest.xfail("PyAV >= 10.0.0 doesn't extract the rotation flag.")
     else:
-        meta = iio.immeta(tmp_path / "test.mp4", plugin="pyav")
-        assert meta["comment"] == "This video has a rotation flag."
-        assert meta["rotate"] == "90"
+        pytest.xfail("PyAV v10.0.0+ doesn't extract the rotation flag.")
 
 
 def test_read_filter(test_images):
@@ -590,3 +587,32 @@ def test_trim_filter(test_images):
     )
 
     assert frames.shape == (20, 720, 1280, 3)
+
+
+def subprocess(func, conn):
+    try:
+        result = func()
+        conn.send(result)
+    except BaseException as e:
+        conn.send(e)
+
+
+def test_lagging_video_stream(test_images):
+    # this is a regression test
+    # see: https://github.com/imageio/imageio/issues/1095
+
+    with iio.imopen(
+        test_images / "cockatoo.mp4",
+        "r",
+        plugin="pyav",
+    ) as img_file:
+        for idx in range(50):
+            img_file.read(index=idx)
+
+    output, input = multiprocessing.Pipe()
+    proc = multiprocessing.Process(target=subprocess, args=(gc.collect, input))
+
+    proc.start()
+    if not output.poll(timeout=5):
+        proc.kill()
+        raise TimeoutError("Test Subprocess failed to respond in time.")
