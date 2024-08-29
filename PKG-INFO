@@ -1,6 +1,6 @@
 Metadata-Version: 2.1
 Name: imageio
-Version: 2.31.5
+Version: 2.35.1
 Summary: Library for reading and writing a wide range of image, video, scientific, and volumetric data formats.
 Home-page: https://github.com/imageio/imageio
 Download-URL: http://pypi.python.org/pypi/imageio
@@ -44,6 +44,8 @@ Provides-Extra: pyav
 Provides-Extra: fits
 Provides-Extra: gdal
 Provides-Extra: itk
+Provides-Extra: rawpy
+Provides-Extra: pillow-heif
 Provides-Extra: full
 Provides-Extra: dev
 Provides-Extra: all-plugins
